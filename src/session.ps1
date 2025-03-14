@@ -18,20 +18,6 @@ function Test-XoSession {
     }
 }
 
-function ConvertFrom-XoSecureString {
-    [CmdletBinding()]
-    param (
-        [Parameter(Mandatory, Position = 0, ValueFromPipeline)][securestring]$SecureString
-    )
-    $bstr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($SecureString)
-    try {
-        return [System.Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)
-    }
-    finally {
-        [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
-    }
-}
-
 # We end up using normal strings in the token anyway, but the main purpose of using PSCredential is to avoid saving/printing stuff in logs or console output
 function Connect-XoSession {
     <#
@@ -46,7 +32,7 @@ function Connect-XoSession {
         [Parameter(ParameterSetName = "Login")][securestring]$Otp,
         [Parameter(ParameterSetName = "Login")][System.DateTimeOffset]$ExpiresAt,
         # Token to assign to session.
-        [Parameter(ParameterSetName = "Token")][System.Object]$Token,
+        [Parameter(ParameterSetName = "Token")]$Token,
         [Parameter()][switch]$SaveCredentials,
         # Insecure: skip certificate validation checks.
         [Parameter()][switch]$SkipCertificateCheck

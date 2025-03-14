@@ -1,32 +1,90 @@
-# Function to list all tasks on the xoa
-function XoTasks-List {
-    param (
-        [string]$Fields = ""  # Default value for fields
+$script:XO_TASK_FIELDS = "id,properties.method,start,status"
+
+function ConvertTo-XoTask {
+    param(
+        [Parameter(Mandatory, ValueFromPipeline, Position = 0)]$InputObject
     )
 
-    # Build URL based on $Fields value
-    if ([string]::IsNullOrEmpty($Fields)) {
-        $uri = "$script:XenOrchestraHost/rest/v0/tasks"
+    process {
+        Set-XoObject $InputObject -TypeName XoPowershell.Task -Properties @{
+            TaskId    = $InputObject.id
+            Method    = $InputObject.properties.method
+            StartTime = [System.DateTimeOffset]::FromUnixTimeMilliseconds($InputObject.start)
+        }
     }
-    else {
-        $uri = "$script:XenOrchestraHost/rest/v0/tasks?filter=$Fields"
-    }
-
-    $response = Invoke-RestMethod -Uri $uri -Method Get -Headers $script:headers -SkipCertificateCheck
-    return $response
 }
 
-# Function to show details of a tasks on the xoa
-function XoTasks-Details {
-    param (
-        [string]$TaskId  # Default value for fields
+function Get-XoTask {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory, ValueFromPipeline, ParameterSetName = "Pipeline")]
+        $InputObject,
+
+        [Parameter(Mandatory, Position = 0, ParameterSetName = "TaskId")]
+        [ValidatePattern("[0-9a-z]+")]
+        [string[]]$TaskId,
+
+        [Parameter(ParameterSetName = "Status")]
+        [ValidateSet("pending", "success", "failure")]
+        [string]$Status = "pending"
     )
-    $IsValid = Check-TaskID($TaskId)
-    if (-not $IsValid) {
-        Write-Error "Invalid TaskID"
-        return
+
+    begin {
+        $params = Remove-XoEmptyValues @{
+            fields = $script:XO_TASK_FIELDS
+        }
     }
-    $uri = "$script:XenOrchestraHost/rest/v0/tasks/$TaskId"
-    $response = Invoke-RestMethod -Uri $uri -Method Get -Headers $script:headers -SkipCertificateCheck
-    return $response
+
+    process {
+        if ($PSCmdlet.ParameterSetName -eq "Pipeline") {
+            ConvertTo-XoTask (Invoke-RestMethod -Uri "$script:XoHost/rest/v0/tasks/$($InputObject.id)" @script:XoRestParameters -Body $params)
+        }
+    }
+
+    end {
+        if ($PSCmdlet.ParameterSetName -eq "TaskId") {
+            foreach ($id in $TaskId) {
+                ConvertTo-XoTask (Invoke-RestMethod -Uri "$script:XoHost/rest/v0/tasks/$($id)" @script:XoRestParameters -Body $params)
+            }
+        }
+        elseif ($PSCmdlet.ParameterSetName -eq "Status") {
+            (Invoke-RestMethod -Uri "$script:XoHost/rest/v0/tasks" @script:XoRestParameters -Body @{
+                fields = $script:XO_TASK_FIELDS
+                filter = $Status
+            }) | ConvertTo-XoTask
+        }
+    }
+}
+New-Alias -Name Get-XoTaskDetails -Value Get-XoTask
+
+function Wait-XoTask {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory, ValueFromPipelineByPropertyName, Position = 0)]
+        [ValidatePattern("[0-9a-z]+")]
+        [string[]]$TaskId,
+        [Parameter()][switch]$PassThru
+    )
+
+    begin {
+        $params = @{
+            fields = $script:XO_TASK_FIELDS
+            wait   = "result"
+        }
+        $ids = @()
+    }
+
+    process {
+        # Accumulate all specified tasks and wait once at the end.
+        $ids += $TaskId
+    }
+
+    end {
+        foreach ($id in $ids) {
+            $result = Invoke-RestMethod -Uri "$script:XoHost/rest/v0/tasks/$id" @script:XoRestParameters -Body $params
+            if ($PassThru) {
+                $result | ConvertTo-XoTask
+            }
+        }
+    }
 }

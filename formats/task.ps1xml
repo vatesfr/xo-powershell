@@ -3,25 +3,25 @@
     xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/PowerShell/PowerShell/master/src/Schemas/Format.xsd">
     <ViewDefinitions>
         <View>
-            <Name>XoPowershell.Vm</Name>
+            <Name>XoPowershell.Task</Name>
             <ViewSelectedBy>
-                <TypeName>XoPowershell.Vm</TypeName>
+                <TypeName>XoPowershell.Task</TypeName>
             </ViewSelectedBy>
             <TableControl>
                 <TableRowEntries>
                     <TableRowEntry>
                         <TableColumnItems>
                             <TableColumnItem>
-                                <PropertyName>VmUuid</PropertyName>
+                                <PropertyName>TaskId</PropertyName>
                             </TableColumnItem>
                             <TableColumnItem>
-                                <PropertyName>Name</PropertyName>
+                                <PropertyName>Method</PropertyName>
                             </TableColumnItem>
                             <TableColumnItem>
-                                <PropertyName>PowerState</PropertyName>
+                                <PropertyName>Status</PropertyName>
                             </TableColumnItem>
                             <TableColumnItem>
-                                <PropertyName>IpAddresses</PropertyName>
+                                <PropertyName>StartTime</PropertyName>
                             </TableColumnItem>
                         </TableColumnItems>
                     </TableRowEntry>

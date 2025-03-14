@@ -8,21 +8,30 @@
     Description       = 'Xen Orchestra PowerShell module'
     PowerShellVersion = '7.0'
     FunctionsToExport = @(
-        # session.ps1
+        # session
         "Test-XoSession"
         "Connect-XoSession"
         "Disconnect-XoSession"
-        # vm.ps1
+        # task
+        "Get-XoTask"
+        "Wait-XoTask"
+        # vm
         "Get-XoVm"
         "Get-XoVmVdi"
+        "Start-XoVm"
         "Stop-XoVm"
+        "Restart-XoVm"
+        "New-XoVmSnapshot"
     )
     AliasesToExport   = @(
         "Connect-XenOrchestra"
         "Disconnect-XenOrchestra"
+        # task
+        "Get-XoTaskDetails"
     )
     FormatsToProcess  = @(
-        "formats/vm.ps1xml"
+        "formats/task.ps1xml"
         "formats/vdi.ps1xml"
+        "formats/vm.ps1xml"
     )
 }

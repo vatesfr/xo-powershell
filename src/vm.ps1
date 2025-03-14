@@ -1,22 +1,79 @@
+$script:XO_VM_FIELDS = "name_label,name_description,power_state,uuid,addresses"
+
+function ConvertTo-XoVmObject {
+    param(
+        [Parameter(Mandatory, ValueFromPipeline, Position = 0)]$InputObject
+    )
+
+    process {
+        $props = @{
+            VmUuid      = $InputObject.uuid
+            Name        = $InputObject.name_label
+            PowerState  = $InputObject.power_state
+            IpAddresses = ""
+        }
+        if ($InputObject.power_state -ieq "Running") {
+            $props["IpAddresses"] = $InputObject.addresses.PSObject.Properties | Where-Object MemberType -eq NoteProperty | Select-Object -ExpandProperty Value
+        }
+        Set-XoObject $InputObject -TypeName XoPowershell.Vm -Properties $props
+    }
+}
+
+# Get-XoVm has 3 parameter sets for specifying inputs in 3 ways:
+# - Pipeline (... | get-xovm)
+# - ID list (get-xovm aaaaa,bbbbb)
+# - Queries (get-xovm -powerstate)
+# This is a special treatment we reserve for commonly-used cmdlets.
 function Get-XoVm {
     [CmdletBinding()]
     param (
-        [Parameter()]
+        [Parameter(Mandatory, ValueFromPipeline, ParameterSetName = "Pipeline")]
+        $InputObject,
+
+        [Parameter(Mandatory, Position = 0, ParameterSetName = "VmUuid")]
+        [ValidatePattern("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")]
+        [string[]]$VmUuid,
+
+        [Parameter(ParameterSetName = "PowerState")]
         [ValidateSet("Halted", "Paused", "Running", "Suspended")]
+        [Alias("Status")]
         [string[]]$PowerState
     )
 
-    $filter = ""
-    if ($PowerState) {
-        $filter += " power_state:|($($PowerState -join ' '))"
+    begin {
+        $params = @{
+            fields = $script:XO_VM_FIELDS
+        }
     }
 
-    $params = Remove-XoEmptyValues @{
-        filter = $filter
-        fields = "name_label,name_description,power_state,uuid"
+    process {
+        if ($PSCmdlet.ParameterSetName -eq "Pipeline") {
+            # faster than pipeline
+            ConvertTo-XoVmObject (Invoke-RestMethod -Uri "$script:XoHost/rest/v0/vms/$($InputObject.uuid)" @script:XoRestParameters -Body $params)
+        }
     }
 
-    Invoke-RestMethod -Uri "$script:XoHost/rest/v0/vms" @script:XoRestParameters -Body $params | Set-XoObject -TypeName XoPowershell.Vm
+    end {
+        if ($PSCmdlet.ParameterSetName -eq "VmUuid") {
+            foreach ($id in $VmUuid) {
+                ConvertTo-XoVmObject (Invoke-RestMethod -Uri "$script:XoHost/rest/v0/vms/$id" @script:XoRestParameters -Body $params)
+            }
+        }
+        elseif ($PSCmdlet.ParameterSetName -eq "PowerState") {
+            $filter = ""
+            if ($PowerState) {
+                $filter += " power_state:|($($PowerState -join ' '))"
+            }
+
+            $params = Remove-XoEmptyValues @{
+                filter = $filter
+                fields = $script:XO_VM_FIELDS
+            }
+
+            # the parentheses forces the resulting array to unpack, don't remove them!
+            (Invoke-RestMethod -Uri "$script:XoHost/rest/v0/vms" @script:XoRestParameters -Body $params) | ConvertTo-XoVmObject
+        }
+    }
 }
 
 function Get-XoVmVdi {
@@ -24,20 +81,33 @@ function Get-XoVmVdi {
     param (
         [Parameter(Mandatory, ValueFromPipelineByPropertyName)]
         [ValidateNotNullOrEmpty()]
-        [string[]]$Uuid
+        [string]$VmUuid
     )
 
     begin {
-        $params = Remove-XoEmptyValues @{
-            fields = "name_label,size,uuid"
+        $params = @{
+            fields = $XO_VDI_FIELDS
         }
     }
 
     process {
-        $Uuid | ForEach-Object {
-            Invoke-RestMethod -Uri "$script:XoHost/rest/v0/vms/$_/vdis" @script:XoRestParameters -Body $params
-        } | Set-XoObject -TypeName XoPowershell.Vdi -Properties @{
-            VmUuid = $Uuid
+        (Invoke-RestMethod -Uri "$script:XoHost/rest/v0/vms/$VmUuid/vdis" @script:XoRestParameters -Body $params) | ConvertTo-XoVdiObject
+    }
+}
+
+function Start-XoVm {
+    [CmdletBinding(SupportsShouldProcess, ConfirmImpact = "Low")]
+    param (
+        [Parameter(Mandatory, ValueFromPipelineByPropertyName)]
+        [ValidateNotNullOrEmpty()]
+        [string]$VmUuid
+    )
+
+    process {
+        if ($PSCmdlet.ShouldProcess($VmUuid, $action)) {
+            Invoke-RestMethod -Uri "$script:XoHost/rest/v0/vms/$VmUuid/actions/start" -Method Post @script:XoRestParameters | ForEach-Object {
+                Get-XoTask $_.id
+            }
         }
     }
 }
@@ -47,53 +117,65 @@ function Stop-XoVm {
     param (
         [Parameter(Mandatory, ValueFromPipelineByPropertyName)]
         [ValidateNotNullOrEmpty()]
-        [string[]]$Uuid,
+        [string]$VmUuid,
         [Parameter()][switch]$Force
     )
 
     begin {
-        $action = if ($Force) { "hard_shutdown" }else { "clean_shutdown" }
+        $action = if ($Force) { "hard_shutdown" } else { "clean_shutdown" }
     }
 
     process {
-        $Uuid | ForEach-Object {
-            if ($PSCmdlet.ShouldProcess($_, $action)) {
-                Invoke-RestMethod -Uri "$script:XoHost/rest/v0/vms/$_/actions/$action" @script:XoRestParameters
+        if ($PSCmdlet.ShouldProcess($VmUuid, $action)) {
+            Invoke-RestMethod -Uri "$script:XoHost/rest/v0/vms/$VmUuid/actions/$action" -Method Post @script:XoRestParameters | ForEach-Object {
+                Get-XoTask $_.id
             }
         }
     }
 }
 
-######
-
-# Function to start,restart,shutdown vms on the xoa cluster
-function XoVms-Action {
+function Restart-XoVm {
+    [CmdletBinding(SupportsShouldProcess, ConfirmImpact = "Medium")]
     param (
-        [string]$VmId,
-        [ValidateSet("start", "clean_reboot", "hard_reboot", "clean_shutdown", "hard_shutdown")]
-        [string]$Action
+        [Parameter(Mandatory, ValueFromPipelineByPropertyName)]
+        [ValidateNotNullOrEmpty()]
+        [string]$VmUuid,
+        [Parameter()][switch]$Force
     )
-    $IsValid = Check-VmID($VmId)
-    if (-not $IsValid) {
-        Write-Error "Invalid VmID"
-        return
+
+    begin {
+        $action = if ($Force) { "hard_reboot" } else { "clean_reboot" }
     }
-    $uri = "$script:XenOrchestraHost/rest/v0/vms/$VmId/actions/$Action"
-    $response = Invoke-RestMethod -Uri $uri -Method Post -Headers $script:headers -SkipCertificateCheck
-    return $response
+
+    process {
+        if ($PSCmdlet.ShouldProcess($VmUuid, $action)) {
+            Invoke-RestMethod -Uri "$script:XoHost/rest/v0/vms/$VmUuid/actions/$action" -Method Post @script:XoRestParameters | ForEach-Object {
+                Get-XoTask $_.id
+            }
+        }
+    }
 }
 
-# Function to take a snapshot of a vms on the xoa cluster
-function XoVms-Snapshot {
+function New-XoVmSnapshot {
+    [CmdletBinding(SupportsShouldProcess)]
     param (
-        [string]$VmId
+        [Parameter(Mandatory, ValueFromPipelineByPropertyName)]
+        [ValidateNotNullOrEmpty()]
+        [string]$VmUuid,
+        [Parameter()][string]$SnapshotName
     )
-    $IsValid = Check-VmID($VmId)
-    if (-not $IsValid) {
-        Write-Error "Invalid VmID"
-        return
+
+    begin {
+        $params = Remove-XoEmptyValues @{
+            name_label = $SnapshotName
+        }
     }
-    $uri = "$script:XenOrchestraHost/rest/v0/vms/$VmId/actions/snapshot"
-    $response = Invoke-RestMethod -Uri $uri -Method Post -Headers $script:headers -SkipCertificateCheck
-    return $response
+
+    process {
+        if ($PSCmdlet.ShouldProcess($VmUuid, $action)) {
+            Invoke-RestMethod -Uri "$script:XoHost/rest/v0/vms/$VmUuid/actions/snapshot" -Method Post @script:XoRestParameters -Body $params | ForEach-Object {
+                Get-XoTask $_.id
+            }
+        }
+    }
 }

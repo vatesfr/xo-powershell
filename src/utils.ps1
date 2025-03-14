@@ -14,23 +14,36 @@ function Remove-XoEmptyValues {
 function Set-XoObject {
     [CmdletBinding()]
     param(
-        [Parameter(Mandatory, ValueFromPipeline, Position = 0)][System.Object[]]$InputObject,
+        [Parameter(Mandatory, ValueFromPipeline, Position = 0)]$InputObject,
         [Parameter()][string]$TypeName,
         [Parameter()][hashtable]$Properties,
         [Parameter()][switch]$Foo
     )
 
+    if ($TypeName) {
+        $InputObject.PSObject.TypeNames.Insert(0, $TypeName) > $null
+    }
+    if ($Properties) {
+        foreach ($key in $Properties.Keys) {
+            $InputObject.PSObject.Properties.Add([psnoteproperty]::new($key, $Properties[$key])) > $null
+        }
+    }
+    [PSCustomObject]$InputObject
+}
+
+function ConvertFrom-XoSecureString {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory, Position = 0, ValueFromPipeline)][securestring]$SecureString
+    )
+
     process {
-        foreach ($obj in $InputObject) {
-            if ($TypeName) {
-                $obj.PSObject.TypeNames.Insert(0, $TypeName) > $null
-            }
-            if ($Properties) {
-                foreach ($key in $Properties.Keys) {
-                    $obj.PSObject.Properties.Add([psnoteproperty]::new($key, $Properties[$key])) > $null
-                }
-            }
-            [PSCustomObject]$obj
+        $bstr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($SecureString)
+        try {
+            return [System.Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)
+        }
+        finally {
+            [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
         }
     }
 }
@@ -43,7 +56,7 @@ function Format-XoSize {
 
     # based off of https://stackoverflow.com/a/40887001/8642889
 
-    $suffix = "B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"
+    $suffix = " B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"
     $index = 0
     while ($Value -gt 1kb -and $index -lt $suffix.Length) {
         $Value = $Value / 1kb

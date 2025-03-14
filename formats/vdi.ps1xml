@@ -12,14 +12,14 @@
                     <TableRowEntry>
                         <TableColumnItems>
                             <TableColumnItem>
-                                <PropertyName>name_label</PropertyName>
+                                <PropertyName>Name</PropertyName>
                             </TableColumnItem>
                             <TableColumnItem>
-                                <PropertyName>size</PropertyName>
+                                <PropertyName>VdiSize</PropertyName>
                                 <Alignment>Right</Alignment>
                             </TableColumnItem>
                             <TableColumnItem>
-                                <PropertyName>uuid</PropertyName>
+                                <PropertyName>VdiUuid</PropertyName>
                             </TableColumnItem>
                         </TableColumnItems>
                     </TableRowEntry>
