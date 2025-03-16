@@ -14,3 +14,26 @@ function ConvertTo-XoVdiObject {
         Set-XoObject $InputObject -TypeName XoPowershell.Vdi -Properties $props
     }
 }
+
+function Get-XoVdi {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory, ValueFromPipelineByPropertyName, Position = 0, ParameterSetName = "VdiId")]
+        [ValidatePattern("[0-9a-z]+")]
+        [string[]]$VdiId
+    )
+
+    begin {
+        $params = Remove-XoEmptyValues @{
+            fields = $script:XO_VDI_FIELDS
+        }
+    }
+
+    process {
+        if ($PSCmdlet.ParameterSetName -eq "VdiId") {
+            foreach ($id in $VdiId) {
+                ConvertTo-XoVdiObject (Invoke-RestMethod -Uri "$script:XoHost/rest/v0/vdis/$($id)" @script:XoRestParameters -Body $params)
+            }
+        }
+    }
+}

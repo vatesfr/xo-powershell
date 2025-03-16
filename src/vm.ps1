@@ -22,13 +22,20 @@ function ConvertTo-XoVmObject {
 # Get-XoVm has 2 parameter sets for specifying inputs in 3 ways:
 # - ID list (get-xovm aaaaa,bbbbb)
 # - Queries (get-xovm -powerstate)
+# To add documentation, add a comment block (<##>) with a synopsis, then add parameter comments as below.
 function Get-XoVm {
+    <#
+    .SYNOPSIS
+        Query VMs by UUID or condition.
+    #>
     [CmdletBinding()]
     param (
+        # UUIDs of VMs to query.
         [Parameter(Mandatory, ValueFromPipelineByPropertyName, Position = 0, ParameterSetName = "VmUuid")]
         [ValidatePattern("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")]
         [string[]]$VmUuid,
 
+        # Power states of VMs to query.
         [Parameter(ParameterSetName = "PowerState")]
         [ValidateSet("Halted", "Paused", "Running", "Suspended")]
         [Alias("Status")]
@@ -72,7 +79,7 @@ function Get-XoVmVdi {
     param (
         [Parameter(Mandatory, ValueFromPipelineByPropertyName)]
         [ValidateNotNullOrEmpty()]
-        [string]$VmUuid
+        [string[]]$VmUuid
     )
 
     begin {
@@ -82,7 +89,9 @@ function Get-XoVmVdi {
     }
 
     process {
-        (Invoke-RestMethod -Uri "$script:XoHost/rest/v0/vms/$VmUuid/vdis" @script:XoRestParameters -Body $params) | ConvertTo-XoVdiObject
+        foreach ($id in $VmUuid) {
+            (Invoke-RestMethod -Uri "$script:XoHost/rest/v0/vms/$id/vdis" @script:XoRestParameters -Body $params) | ConvertTo-XoVdiObject
+        }
     }
 }
 
@@ -91,13 +100,15 @@ function Start-XoVm {
     param (
         [Parameter(Mandatory, ValueFromPipelineByPropertyName)]
         [ValidateNotNullOrEmpty()]
-        [string]$VmUuid
+        [string[]]$VmUuid
     )
 
     process {
-        if ($PSCmdlet.ShouldProcess($VmUuid, $action)) {
-            Invoke-RestMethod -Uri "$script:XoHost/rest/v0/vms/$VmUuid/actions/start" -Method Post @script:XoRestParameters | ForEach-Object {
-                Get-XoTask $_.id
+        foreach ($id in $VmUuid) {
+            if ($PSCmdlet.ShouldProcess($VmUuid, "start")) {
+                Invoke-RestMethod -Uri "$script:XoHost/rest/v0/vms/$VmUuid/actions/start" -Method Post @script:XoRestParameters | ForEach-Object {
+                    ConvertFrom-XoTaskHref $_
+                }
             }
         }
     }
@@ -108,7 +119,7 @@ function Stop-XoVm {
     param (
         [Parameter(Mandatory, ValueFromPipelineByPropertyName)]
         [ValidateNotNullOrEmpty()]
-        [string]$VmUuid,
+        [string[]]$VmUuid,
         [Parameter()][switch]$Force
     )
 
@@ -117,9 +128,11 @@ function Stop-XoVm {
     }
 
     process {
-        if ($PSCmdlet.ShouldProcess($VmUuid, $action)) {
-            Invoke-RestMethod -Uri "$script:XoHost/rest/v0/vms/$VmUuid/actions/$action" -Method Post @script:XoRestParameters | ForEach-Object {
-                Get-XoTask $_.id
+        foreach ($id in $VmUuid) {
+            if ($PSCmdlet.ShouldProcess($VmUuid, $action)) {
+                Invoke-RestMethod -Uri "$script:XoHost/rest/v0/vms/$VmUuid/actions/$action" -Method Post @script:XoRestParameters | ForEach-Object {
+                    ConvertFrom-XoTaskHref $_
+                }
             }
         }
     }
@@ -130,7 +143,7 @@ function Restart-XoVm {
     param (
         [Parameter(Mandatory, ValueFromPipelineByPropertyName)]
         [ValidateNotNullOrEmpty()]
-        [string]$VmUuid,
+        [string[]]$VmUuid,
         [Parameter()][switch]$Force
     )
 
@@ -139,9 +152,11 @@ function Restart-XoVm {
     }
 
     process {
-        if ($PSCmdlet.ShouldProcess($VmUuid, $action)) {
-            Invoke-RestMethod -Uri "$script:XoHost/rest/v0/vms/$VmUuid/actions/$action" -Method Post @script:XoRestParameters | ForEach-Object {
-                Get-XoTask $_.id
+        foreach ($id in $VmUuid) {
+            if ($PSCmdlet.ShouldProcess($VmUuid, $action)) {
+                Invoke-RestMethod -Uri "$script:XoHost/rest/v0/vms/$VmUuid/actions/$action" -Method Post @script:XoRestParameters | ForEach-Object {
+                    ConvertFrom-XoTaskHref $_
+                }
             }
         }
     }
@@ -152,7 +167,7 @@ function New-XoVmSnapshot {
     param (
         [Parameter(Mandatory, ValueFromPipelineByPropertyName)]
         [ValidateNotNullOrEmpty()]
-        [string]$VmUuid,
+        [string[]]$VmUuid,
         [Parameter()][string]$SnapshotName
     )
 
@@ -163,9 +178,11 @@ function New-XoVmSnapshot {
     }
 
     process {
-        if ($PSCmdlet.ShouldProcess($VmUuid, $action)) {
-            Invoke-RestMethod -Uri "$script:XoHost/rest/v0/vms/$VmUuid/actions/snapshot" -Method Post @script:XoRestParameters -Body $params | ForEach-Object {
-                Get-XoTask $_.id
+        foreach ($id in $VmUuid) {
+            if ($PSCmdlet.ShouldProcess($VmUuid, "snapshot")) {
+                Invoke-RestMethod -Uri "$script:XoHost/rest/v0/vms/$VmUuid/actions/snapshot" -Method Post @script:XoRestParameters -Body $params | ForEach-Object {
+                    ConvertFrom-XoTaskHref $_
+                }
             }
         }
     }

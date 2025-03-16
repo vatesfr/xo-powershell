@@ -1,6 +1,6 @@
 $script:XO_TASK_FIELDS = "id,properties.method,start,status"
 
-function ConvertTo-XoTask {
+function ConvertTo-XoTaskObject {
     param(
         [Parameter(Mandatory, ValueFromPipeline, Position = 0)]$InputObject
     )
@@ -9,8 +9,21 @@ function ConvertTo-XoTask {
         Set-XoObject $InputObject -TypeName XoPowershell.Task -Properties @{
             TaskId    = $InputObject.id
             Method    = $InputObject.properties.method
-            StartTime = [System.DateTimeOffset]::FromUnixTimeMilliseconds($InputObject.start)
+            StartTime = [System.DateTimeOffset]::FromUnixTimeMilliseconds($InputObject.start).ToLocalTime()
         }
+    }
+}
+
+function ConvertFrom-XoTaskHref {
+    param(
+        [Parameter(Mandatory, ValueFromPipeline, Position = 0)][string]$Uri
+    )
+
+    process {
+        if ($Uri -notmatch "\/rest\/v0\/tasks\/[0-9a-z]+") {
+            throw "Bad task href format"
+        }
+        Get-XoTask ([uri]::new([uri]$script:XoHost, $Uri).Segments[-1])
     }
 }
 
@@ -35,7 +48,7 @@ function Get-XoTask {
     process {
         if ($PSCmdlet.ParameterSetName -eq "TaskId") {
             foreach ($id in $TaskId) {
-                ConvertTo-XoTask (Invoke-RestMethod -Uri "$script:XoHost/rest/v0/tasks/$($id)" @script:XoRestParameters -Body $params)
+                ConvertTo-XoTaskObject (Invoke-RestMethod -Uri "$script:XoHost/rest/v0/tasks/$($id)" @script:XoRestParameters -Body $params)
             }
         }
     }
@@ -45,7 +58,7 @@ function Get-XoTask {
             (Invoke-RestMethod -Uri "$script:XoHost/rest/v0/tasks" @script:XoRestParameters -Body @{
                 fields = $script:XO_TASK_FIELDS
                 filter = $Status
-            }) | ConvertTo-XoTask
+            }) | ConvertTo-XoTaskObject
         }
     }
 }
@@ -77,7 +90,7 @@ function Wait-XoTask {
         foreach ($id in $ids) {
             $result = Invoke-RestMethod -Uri "$script:XoHost/rest/v0/tasks/$id" @script:XoRestParameters -Body $params
             if ($PassThru) {
-                $result | ConvertTo-XoTask
+                $result | ConvertTo-XoTaskObject
             }
         }
     }

@@ -8,7 +8,7 @@ function Test-XoSession {
 
     # TODO: Do we have a test endpoint for Xo tokens?
     try {
-        Invoke-RestMethod -Uri "$script:XoHost/rest/v0/vms" @script:XoRestParameters | Out-Null
+        Get-XoTask | Out-Null
         Write-Verbose "Successful connection to Xen Orchestra - $script:XoHost"
         return $true
     }

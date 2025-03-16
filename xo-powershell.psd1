@@ -12,9 +12,13 @@
         "Test-XoSession"
         "Connect-XoSession"
         "Disconnect-XoSession"
+        # sr
+        "Get-XoSr"
         # task
         "Get-XoTask"
         "Wait-XoTask"
+        # vdi
+        "Get-XoVdi"
         # vm
         "Get-XoVm"
         "Get-XoVmVdi"
@@ -30,6 +34,7 @@
         "Get-XoTaskDetails"
     )
     FormatsToProcess  = @(
+        "formats/sr.ps1xml"
         "formats/task.ps1xml"
         "formats/vdi.ps1xml"
         "formats/vm.ps1xml"
