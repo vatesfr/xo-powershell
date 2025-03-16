@@ -19,18 +19,13 @@ function ConvertTo-XoVmObject {
     }
 }
 
-# Get-XoVm has 3 parameter sets for specifying inputs in 3 ways:
-# - Pipeline (... | get-xovm)
+# Get-XoVm has 2 parameter sets for specifying inputs in 3 ways:
 # - ID list (get-xovm aaaaa,bbbbb)
 # - Queries (get-xovm -powerstate)
-# This is a special treatment we reserve for commonly-used cmdlets.
 function Get-XoVm {
     [CmdletBinding()]
     param (
-        [Parameter(Mandatory, ValueFromPipeline, ParameterSetName = "Pipeline")]
-        $InputObject,
-
-        [Parameter(Mandatory, Position = 0, ParameterSetName = "VmUuid")]
+        [Parameter(Mandatory, ValueFromPipelineByPropertyName, Position = 0, ParameterSetName = "VmUuid")]
         [ValidatePattern("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")]
         [string[]]$VmUuid,
 
@@ -47,19 +42,15 @@ function Get-XoVm {
     }
 
     process {
-        if ($PSCmdlet.ParameterSetName -eq "Pipeline") {
-            # faster than pipeline
-            ConvertTo-XoVmObject (Invoke-RestMethod -Uri "$script:XoHost/rest/v0/vms/$($InputObject.uuid)" @script:XoRestParameters -Body $params)
-        }
-    }
-
-    end {
         if ($PSCmdlet.ParameterSetName -eq "VmUuid") {
             foreach ($id in $VmUuid) {
                 ConvertTo-XoVmObject (Invoke-RestMethod -Uri "$script:XoHost/rest/v0/vms/$id" @script:XoRestParameters -Body $params)
             }
         }
-        elseif ($PSCmdlet.ParameterSetName -eq "PowerState") {
+    }
+
+    end {
+        if ($PSCmdlet.ParameterSetName -eq "PowerState") {
             $filter = ""
             if ($PowerState) {
                 $filter += " power_state:|($($PowerState -join ' '))"

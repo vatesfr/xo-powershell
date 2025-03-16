@@ -17,10 +17,7 @@ function ConvertTo-XoTask {
 function Get-XoTask {
     [CmdletBinding()]
     param(
-        [Parameter(Mandatory, ValueFromPipeline, ParameterSetName = "Pipeline")]
-        $InputObject,
-
-        [Parameter(Mandatory, Position = 0, ParameterSetName = "TaskId")]
+        [Parameter(Mandatory, ValueFromPipelineByPropertyName, Position = 0, ParameterSetName = "TaskId")]
         [ValidatePattern("[0-9a-z]+")]
         [string[]]$TaskId,
 
@@ -36,18 +33,15 @@ function Get-XoTask {
     }
 
     process {
-        if ($PSCmdlet.ParameterSetName -eq "Pipeline") {
-            ConvertTo-XoTask (Invoke-RestMethod -Uri "$script:XoHost/rest/v0/tasks/$($InputObject.id)" @script:XoRestParameters -Body $params)
-        }
-    }
-
-    end {
         if ($PSCmdlet.ParameterSetName -eq "TaskId") {
             foreach ($id in $TaskId) {
                 ConvertTo-XoTask (Invoke-RestMethod -Uri "$script:XoHost/rest/v0/tasks/$($id)" @script:XoRestParameters -Body $params)
             }
         }
-        elseif ($PSCmdlet.ParameterSetName -eq "Status") {
+    }
+
+    end {
+        if ($PSCmdlet.ParameterSetName -eq "Status") {
             (Invoke-RestMethod -Uri "$script:XoHost/rest/v0/tasks" @script:XoRestParameters -Body @{
                 fields = $script:XO_TASK_FIELDS
                 filter = $Status
