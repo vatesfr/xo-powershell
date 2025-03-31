@@ -82,7 +82,6 @@ function Wait-XoTask {
     }
 
     process {
-        # Accumulate all specified tasks and wait once at the end.
         $ids += $TaskId
     }
 

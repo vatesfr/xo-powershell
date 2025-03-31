@@ -12,13 +12,22 @@
         "Test-XoSession"
         "Connect-XoSession"
         "Disconnect-XoSession"
+        
         # sr
         "Get-XoSr"
+        
         # task
         "Get-XoTask"
         "Wait-XoTask"
+        
         # vdi
         "Get-XoVdi"
+        "Export-XoVdi"
+        
+        # vdi-snapshot
+        "Get-XoVdiSnapshot"
+        "Export-XoVdiSnapshot"
+        
         # vm
         "Get-XoVm"
         "Get-XoVmVdi"
@@ -26,6 +35,14 @@
         "Stop-XoVm"
         "Restart-XoVm"
         "New-XoVmSnapshot"
+        "Get-XoVmSnapshot"
+        "Suspend-XoVm"
+        
+        # server
+        "Get-XoServer"
+        
+        # host
+        "Get-XoHost"
     )
     AliasesToExport   = @(
         "Connect-XenOrchestra"
@@ -38,5 +55,9 @@
         "formats/task.ps1xml"
         "formats/vdi.ps1xml"
         "formats/vm.ps1xml"
+        "formats/vdi-snapshot.ps1xml"
+        "formats/vm-snapshot.ps1xml"
+        "formats/server.ps1xml"
+        "formats/host.ps1xml"
     )
 }
