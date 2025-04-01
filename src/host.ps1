@@ -134,7 +134,7 @@ function Get-XoHost {
                     Write-Warning "No host data received for ID $id"
                 }
             } catch {
-                Write-Error "Failed to retrieve host with ID $id. Error: $_"
+                throw "Failed to retrieve host with ID $id. Error: $_"
             }
         }
         return
@@ -179,7 +179,7 @@ function Get-XoHost {
                         Write-Warning "No host details received for ID $hostId"
                     }
                 } catch {
-                    Write-Error "Failed to get details for host $hostId : $_"
+                    throw "Failed to get details for host $hostId : $_"
                 }
             } else {
                 Write-Warning "Could not extract host ID from URL: $cleanUrl"
@@ -193,6 +193,6 @@ function Get-XoHost {
         }
     }
     catch {
-        Write-Error "Failed to list hosts. Error: $_"
+        throw "Failed to list hosts. Error: $_"
     }
 }
