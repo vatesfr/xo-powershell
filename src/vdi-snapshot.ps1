@@ -80,11 +80,11 @@ function Get-XoVdiSnapshot {
                     if ($snapshotData) {
                         ConvertTo-XoVdiSnapshotObject $snapshotData
                     } else {
-                        Write-Warning "No VDI snapshot found with ID $id"
+                        throw "No VDI snapshot found with ID $id"
                     }
                 }
                 catch {
-                    Write-Error "Failed to retrieve VDI snapshot with ID $id. $_"
+                    throw "Failed to retrieve VDI snapshot with ID $id. $_"
                 }
             }
         }
@@ -135,7 +135,7 @@ function Get-XoVdiSnapshot {
                             }
                         }
                         catch {
-                            Write-Warning "Failed to process VDI snapshot. $_"
+                            throw "Failed to process VDI snapshot. $_"
                         }
                     }
 
@@ -145,7 +145,7 @@ function Get-XoVdiSnapshot {
                 }
             }
             catch {
-                Write-Error "Failed to retrieve VDI snapshots. $_"
+                throw "Failed to retrieve VDI snapshots. $_"
             }
         }
     }

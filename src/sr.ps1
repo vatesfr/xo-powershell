@@ -31,10 +31,13 @@ function Get-XoSr {
     .PARAMETER SrId
         The ID(s) of the SR(s) to retrieve.
     .PARAMETER Limit
-        Maximum number of results to return when retrieving all SRs.
+        Maximum number of results to return. Default is 25 if not specified.
     .EXAMPLE
         Get-XoSr
-        Returns all SRs.
+        Returns up to 25 SRs.
+    .EXAMPLE
+        Get-XoSr -Limit 0
+        Returns all SRs without limit.
     .EXAMPLE
         Get-XoSr -SrId "a1b2c3d4"
         Returns the SR with the specified ID.
@@ -45,17 +48,23 @@ function Get-XoSr {
     [CmdletBinding(DefaultParameterSetName = "All")]
     param(
         [Parameter(Mandatory, ValueFromPipelineByPropertyName, Position = 0, ParameterSetName = "SrId")]
-        [ValidatePattern("[0-9a-z]+")]
+        [ValidatePattern("[0-9a-z-]+")]
         [string[]]$SrId,
 
         [Parameter(ParameterSetName = "All")]
-        [int]$Limit
+        [int]$Limit = 25
     )
 
     begin {
-        $params = @{}
-        if ($PSBoundParameters.ContainsKey('Limit')) {
+        $params = @{
+            fields = $script:XO_SR_FIELDS
+        }
+        
+        if ($Limit -ne 0) {
             $params['limit'] = $Limit
+            if (!$PSBoundParameters.ContainsKey('Limit')) {
+                Write-Warning "No limit specified. Using default limit of 25. Use -Limit 0 for unlimited results."
+            }
         }
     }
 
@@ -63,13 +72,13 @@ function Get-XoSr {
         if ($PSCmdlet.ParameterSetName -eq "SrId") {
             foreach ($id in $SrId) {
                 try {
-                    $srData = Invoke-RestMethod -Uri "$script:XoHost/rest/v0/srs/$($id)" @script:XoRestParameters
+                    $srData = Invoke-RestMethod -Uri "$script:XoHost/rest/v0/srs/$($id)" @script:XoRestParameters -Body $params
                     if ($srData) {
                         ConvertTo-XoSrObject $srData
                     }
                 }
                 catch {
-                    Write-Error "Failed to retrieve SR with ID $id. Error: $_"
+                    throw "Failed to retrieve SR with ID $id. Error: $_"
                 }
             }
         }
@@ -78,49 +87,34 @@ function Get-XoSr {
     end {
         if ($PSCmdlet.ParameterSetName -eq "All") {
             try {
-                Write-Verbose "Getting all SRs"
-                $allSrUrls = Invoke-RestMethod -Uri "$script:XoHost/rest/v0/srs" @script:XoRestParameters
+                Write-Verbose "Getting SRs with parameters: $($params | ConvertTo-Json -Compress)"
+                $allSrData = Invoke-RestMethod -Uri "$script:XoHost/rest/v0/srs" @script:XoRestParameters -Body $params
+                
+                if ($allSrData -and $allSrData.Count -gt 0) {
+                    Write-Verbose "Found $($allSrData.Count) SRs"
+                    
+                    foreach ($srItem in $allSrData) {
+                        try {                            
+                            if ($srItem -is [string] -and $srItem -match "\/rest\/v0\/srs\/([^\/]+)$") {
 
-                if ($allSrUrls -and $allSrUrls.Count -gt 0) {
-                    Write-Verbose "Found $($allSrUrls.Count) SRs"
-
-                    # Apply limit if specified
-                    $processLimit = if ($Limit -gt 0) { [Math]::Min($Limit, $allSrUrls.Count) } else { $allSrUrls.Count }
-                    $processUrls = $allSrUrls | Select-Object -First $processLimit
-
-                    foreach ($srUrl in $processUrls) {
-                        # Skip null or empty URLs
-                        if ([string]::IsNullOrEmpty($srUrl)) {
-                            Write-Verbose "Skipping empty URL"
-                            continue
-                        }
-
-                        try {
-                            # Extract the ID from the URL string
-                            $match = [regex]::Match($srUrl, "\/rest\/v0\/srs\/([^\/]+)$")
-                            if ($match.Success) {
-                                $id = $match.Groups[1].Value
-                                if (![string]::IsNullOrEmpty($id)) {
-                                    $srDetail = Invoke-RestMethod -Uri "$script:XoHost/rest/v0/srs/$id" @script:XoRestParameters
-                                    if ($srDetail) {
-                                        ConvertTo-XoSrObject $srDetail
-                                    }
-                                }
-                                else {
-                                    Write-Warning "Failed to extract valid ID from URL: $srUrl"
+                                $id = $matches[1]
+                                Write-Verbose "Fetching SR details for ID $id from URL"
+                                $srDetail = Invoke-RestMethod -Uri "$script:XoHost/rest/v0/srs/$id" @script:XoRestParameters
+                                if ($srDetail) {
+                                    ConvertTo-XoSrObject $srDetail
                                 }
                             }
+                            elseif ($srItem -is [PSCustomObject] -or $srItem -is [Hashtable]) {
+                                Write-Verbose "Processing SR object directly"
+                                ConvertTo-XoSrObject $srItem
+                            }
                             else {
-                                Write-Warning "URL doesn't match expected pattern: $srUrl"
+                                throw "Unexpected SR data format: $($srItem.GetType().Name)"
                             }
                         }
                         catch {
-                            Write-Warning "Failed to process SR from URL $srUrl. Error: $_"
+                            throw "Failed to process SR data. Error: $_"
                         }
-                    }
-
-                    if ($allSrUrls.Count -gt $processLimit) {
-                        Write-Warning "Only processed $processLimit of $($allSrUrls.Count) available SRs. Use -Limit parameter to adjust."
                     }
                 }
                 else {
@@ -128,7 +122,7 @@ function Get-XoSr {
                 }
             }
             catch {
-                Write-Error "Failed to retrieve SRs: $_"
+                throw "Failed to retrieve SRs: $_"
             }
         }
     }

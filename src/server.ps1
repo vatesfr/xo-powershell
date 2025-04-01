@@ -37,16 +37,19 @@ function Get-XoServer {
     .PARAMETER Filter
         Filter to apply to the server query.
     .PARAMETER Limit
-        Maximum number of results to return.
+        Maximum number of results to return. Default is 25 if not specified.
     .EXAMPLE
         Get-XoServer
-        Returns all servers.
+        Returns up to 25 servers.
+    .EXAMPLE
+        Get-XoServer -Limit 0
+        Returns all servers without limit.
     .EXAMPLE
         Get-XoServer -ServerUuid "12345678-abcd-1234-abcd-1234567890ab"
         Returns the server with the specified UUID.
     .EXAMPLE
-        Get-XoServer -Filter "power_state:running"
-        Returns all running servers.
+        Get-XoServer -Filter "status:connected"
+        Returns connected servers (up to default limit).
     #>
     [CmdletBinding(DefaultParameterSetName = "All")]
     param(
@@ -58,7 +61,7 @@ function Get-XoServer {
 
         [Parameter(ParameterSetName = "Filter")]
         [Parameter(ParameterSetName = "All")]
-        [int]$Limit
+        [int]$Limit = 25
     )
 
     begin {
@@ -66,8 +69,12 @@ function Get-XoServer {
         if ($PSBoundParameters.ContainsKey('Filter')) {
             $params['filter'] = $Filter
         }
-        if ($PSBoundParameters.ContainsKey('Limit')) {
+        
+        if ($Limit -ne 0) {
             $params['limit'] = $Limit
+            if (!$PSBoundParameters.ContainsKey('Limit')) {
+                Write-Warning "No limit specified. Using default limit of 25. Use -Limit 0 for unlimited results."
+            }
         }
     }
 
@@ -82,21 +89,19 @@ function Get-XoServer {
                     }
                 }
                 catch {
-                    Write-Error "Failed to retrieve server with ID $id. Error: $_"
+                    throw "Failed to retrieve server with ID $id. Error: $_"
                 }
             }
         }
         else {
             try {
-                Write-Verbose "Getting all servers"
-                $allServerUrls = Invoke-RestMethod -Uri "$script:XoHost/rest/v0/servers" @script:XoRestParameters
-
+                Write-Verbose "Getting servers with parameters: $($params | ConvertTo-Json -Compress)"
+                $allServerUrls = Invoke-RestMethod -Uri "$script:XoHost/rest/v0/servers" @script:XoRestParameters -Body $params
+                
                 if ($allServerUrls -and $allServerUrls.Count -gt 0) {
                     Write-Verbose "Found $($allServerUrls.Count) servers"
-                    $processLimit = if ($Limit -gt 0) { [Math]::Min($Limit, $allServerUrls.Count) } else { $allServerUrls.Count }
-                    $processUrls = $allServerUrls | Select-Object -First $processLimit
-
-                    foreach ($serverUrl in $processUrls) {
+                    
+                    foreach ($serverUrl in $allServerUrls) {
                         if ([string]::IsNullOrEmpty($serverUrl)) {
                             Write-Verbose "Skipping empty URL"
                             continue
@@ -113,20 +118,16 @@ function Get-XoServer {
                                     }
                                 }
                                 else {
-                                    Write-Warning "Failed to extract valid ID from URL: $serverUrl"
+                                    throw "Failed to extract valid ID from URL: $serverUrl"
                                 }
                             }
                             else {
-                                Write-Warning "URL doesn't match expected pattern: $serverUrl"
+                                throw "URL doesn't match expected pattern: $serverUrl"
                             }
                         }
                         catch {
-                            Write-Warning "Failed to process server from URL $serverUrl. Error: $_"
+                            throw "Failed to process server from URL $serverUrl. Error: $_"
                         }
-                    }
-
-                    if ($allServerUrls.Count -gt $processLimit) {
-                        Write-Warning "Only processed $processLimit of $($allServerUrls.Count) available servers. Use -Limit parameter to adjust."
                     }
                 }
                 else {
@@ -134,115 +135,7 @@ function Get-XoServer {
                 }
             }
             catch {
-                Write-Error "Failed to retrieve servers: $_"
-            }
-        }
-    }
-}
-
-function Enable-XoServer {
-    <#
-    .SYNOPSIS
-        Enable a server in Xen Orchestra.
-    .DESCRIPTION
-        Enables a server that has been previously disabled in Xen Orchestra.
-    .PARAMETER ServerUuid
-        The UUID of the server to enable.
-    .EXAMPLE
-        Enable-XoServer -ServerUuid "12345678-abcd-1234-abcd-1234567890ab"
-        Enables the server with the specified UUID.
-    .EXAMPLE
-        Get-XoServer | Where-Object { -not $_.Enabled } | Enable-XoServer
-        Enables all disabled servers.
-    #>
-    [CmdletBinding(SupportsShouldProcess)]
-    param(
-        [Parameter(Mandatory, ValueFromPipelineByPropertyName)]
-        [string[]]$ServerUuid
-    )
-
-    process {
-        foreach ($id in $ServerUuid) {
-            if ($PSCmdlet.ShouldProcess($id, "Enable server")) {
-                try {
-                    Write-Verbose "Enabling server $id"
-                    Invoke-RestMethod -Uri "$script:XoHost/rest/v0/servers/$id/enable" -Method Post @script:XoRestParameters
-                    Write-Verbose "Server enabled successfully"
-                }
-                catch {
-                    Write-Error "Failed to enable server $id. Error: $_"
-                }
-            }
-        }
-    }
-}
-
-function Disable-XoServer {
-    <#
-    .SYNOPSIS
-        Disable a server in Xen Orchestra.
-    .DESCRIPTION
-        Disables a server in Xen Orchestra. Disabled servers are not accessed by Xen Orchestra.
-    .PARAMETER ServerUuid
-        The UUID of the server to disable.
-    .EXAMPLE
-        Disable-XoServer -ServerUuid "12345678-abcd-1234-abcd-1234567890ab"
-        Disables the server with the specified UUID.
-    .EXAMPLE
-        Get-XoServer | Where-Object { $_.Enabled } | Disable-XoServer
-        Disables all enabled servers.
-    #>
-    [CmdletBinding(SupportsShouldProcess, ConfirmImpact = "Medium")]
-    param(
-        [Parameter(Mandatory, ValueFromPipelineByPropertyName)]
-        [string[]]$ServerUuid
-    )
-
-    process {
-        foreach ($id in $ServerUuid) {
-            if ($PSCmdlet.ShouldProcess($id, "Disable server")) {
-                try {
-                    Write-Verbose "Disabling server $id"
-                    Invoke-RestMethod -Uri "$script:XoHost/rest/v0/servers/$id/disable" -Method Post @script:XoRestParameters
-                    Write-Verbose "Server disabled successfully"
-                }
-                catch {
-                    Write-Error "Failed to disable server $id. Error: $_"
-                }
-            }
-        }
-    }
-}
-
-function Restart-XoServer {
-    <#
-    .SYNOPSIS
-        Restart a server's toolstack in Xen Orchestra.
-    .DESCRIPTION
-        Restarts the XAPI toolstack on the specified server.
-    .PARAMETER ServerUuid
-        The UUID of the server to restart the toolstack on.
-    .EXAMPLE
-        Restart-XoServer -ServerUuid "12345678-abcd-1234-abcd-1234567890ab"
-        Restarts the toolstack on the server with the specified UUID.
-    #>
-    [CmdletBinding(SupportsShouldProcess, ConfirmImpact = "High")]
-    param(
-        [Parameter(Mandatory, ValueFromPipelineByPropertyName)]
-        [string[]]$ServerUuid
-    )
-
-    process {
-        foreach ($id in $ServerUuid) {
-            if ($PSCmdlet.ShouldProcess($id, "Restart server toolstack")) {
-                try {
-                    Write-Verbose "Restarting toolstack on server $id"
-                    Invoke-RestMethod -Uri "$script:XoHost/rest/v0/servers/$id/restart-toolstack" -Method Post @script:XoRestParameters
-                    Write-Verbose "Toolstack restart initiated"
-                }
-                catch {
-                    Write-Error "Failed to restart toolstack for server $id. Error: $_"
-                }
+                throw "Failed to retrieve servers: $_"
             }
         }
     }

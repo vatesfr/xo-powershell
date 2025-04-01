@@ -66,7 +66,6 @@ function Connect-XoSession {
         [switch]$SkipCertificateCheck
     )
 
-    # Normalize the hostname
     $script:XoHost = $HostName.TrimEnd("/")
     Write-Verbose "Connecting to Xen Orchestra at $script:XoHost"
 

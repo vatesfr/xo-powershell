@@ -77,7 +77,7 @@ function Get-XoHost {
     .SYNOPSIS
         Get physical hosts from Xen Orchestra.
     .DESCRIPTION
-        Retrieves physical XCP-ng/XenServer hosts from Xen Orchestra.
+        Retrieves physical XCP-ng/XenServer hosts from Xen Orchestra. 
         Can retrieve specific hosts by their UUID or filter hosts by various criteria.
     .PARAMETER HostId
         The UUID(s) of the host(s) to retrieve.
@@ -104,10 +104,10 @@ function Get-XoHost {
         [ValidatePattern("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")]
         [Alias("HostUuid")]
         [string[]]$HostId,
-
+        
         [Parameter(ParameterSetName = "Filter")]
         [string]$Filter,
-
+        
         [Parameter(ParameterSetName = "Filter")]
         [Parameter(ParameterSetName = "All")]
         [int]$Limit = 25

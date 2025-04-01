@@ -102,8 +102,12 @@ function Get-XoVdi {
 
     begin {
         Write-Verbose "Getting VDIs from XO"
+<<<<<<< HEAD
 
         # Base parameters for API requests
+=======
+        
+>>>>>>> b4b1752 (apply Tu's recommandation.)
         $params = Remove-XoEmptyValues @{
             fields = $script:XO_VDI_FIELDS
             filter = if ($PSCmdlet.ParameterSetName -eq "SrFilter") { "sr:$SrUuid" } elseif ($PSCmdlet.ParameterSetName -eq "Filter") { $Filter } else { $null }
@@ -112,7 +116,6 @@ function Get-XoVdi {
     }
 
     process {
-        # Handle individual VDI retrieval
         if ($PSCmdlet.ParameterSetName -eq "VdiId") {
             foreach ($id in $VdiId) {
                 try {
@@ -123,11 +126,11 @@ function Get-XoVdi {
                         ConvertTo-XoVdiObject $vdi
                     }
                     else {
-                        Write-Warning "No VDI found with ID $id"
+                        throw "No VDI found with ID $id"
                     }
                 }
                 catch {
-                    Write-Error "Failed to retrieve VDI with ID $id. Error: $_"
+                    throw "Failed to retrieve VDI with ID $id. Error: $_"
                 }
             }
         }
@@ -161,7 +164,7 @@ function Get-XoVdi {
                 }
             }
             catch {
-                Write-Error "Failed to retrieve VDIs. Error: $_"
+                throw "Failed to retrieve VDIs. Error: $_"
             }
         }
     }
@@ -213,7 +216,6 @@ function Export-XoVdi {
         $taskId = $task.id
         Write-Verbose "Export task started with ID: $taskId"
 
-        # Wait for the task to complete
         Wait-XoTask -TaskId $taskId
 
         # Get the download URL
