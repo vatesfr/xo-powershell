@@ -1,11 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Configuration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/PowerShell/PowerShell/master/src/Schemas/Format.xsd">
+<Configuration>
     <ViewDefinitions>
         <View>
-            <Name>XoPowershell.Host</Name>
+            <Name>XoHost</Name>
             <ViewSelectedBy>
-                <TypeName>XoPowershell.Host</TypeName>
+                <TypeName>XoHost</TypeName>
             </ViewSelectedBy>
             <TableControl>
                 <TableRowEntries>
@@ -21,7 +20,8 @@
                                 <PropertyName>PowerState</PropertyName>
                             </TableColumnItem>
                             <TableColumnItem>
-                                <PropertyName>Memory</PropertyName>
+                                <PropertyName>MemoryFree</PropertyName>
+                                <FormatString>{0:N2} GB</FormatString>
                                 <Alignment>Right</Alignment>
                             </TableColumnItem>
                             <TableColumnItem>
@@ -30,6 +30,29 @@
                         </TableColumnItems>
                     </TableRowEntry>
                 </TableRowEntries>
+                <TableHeaders>
+                    <TableColumnHeader>
+                        <Label>Name</Label>
+                        <Width>20</Width>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Address</Label>
+                        <Width>15</Width>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>PowerState</Label>
+                        <Width>12</Width>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Memory</Label>
+                        <Width>15</Width>
+                        <Alignment>Right</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>HostUuid</Label>
+                        <Width>36</Width>
+                    </TableColumnHeader>
+                </TableHeaders>
             </TableControl>
         </View>
     </ViewDefinitions>
