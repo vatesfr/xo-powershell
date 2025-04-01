@@ -3,17 +3,14 @@
     xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/PowerShell/PowerShell/master/src/Schemas/Format.xsd">
     <ViewDefinitions>
         <View>
-            <Name>XoPowershell.Vm</Name>
+            <Name>XoVm</Name>
             <ViewSelectedBy>
-                <TypeName>XoPowershell.Vm</TypeName>
+                <TypeName>XoVm</TypeName>
             </ViewSelectedBy>
             <TableControl>
                 <TableRowEntries>
                     <TableRowEntry>
                         <TableColumnItems>
-                            <TableColumnItem>
-                                <PropertyName>VmUuid</PropertyName>
-                            </TableColumnItem>
                             <TableColumnItem>
                                 <PropertyName>Name</PropertyName>
                             </TableColumnItem>
@@ -23,9 +20,30 @@
                             <TableColumnItem>
                                 <PropertyName>IpAddresses</PropertyName>
                             </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>VmUuid</PropertyName>
+                            </TableColumnItem>
                         </TableColumnItems>
                     </TableRowEntry>
                 </TableRowEntries>
+                <TableHeaders>
+                    <TableColumnHeader>
+                        <Label>Name</Label>
+                        <Width>20</Width>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>PowerState</Label>
+                        <Width>12</Width>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>IP Addresses</Label>
+                        <Width>15</Width>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>VmUuid</Label>
+                        <Width>36</Width>
+                    </TableColumnHeader>
+                </TableHeaders>
             </TableControl>
         </View>
     </ViewDefinitions>
