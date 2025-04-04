@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 $script:XO_HOST_FIELDS = "uuid,name_label,power_state,memory,address,hostname,version,productBrand"
 
 function ConvertTo-XoHostObject {
@@ -15,7 +17,7 @@ function ConvertTo-XoHostObject {
         [Parameter(Mandatory, ValueFromPipeline)]
         [object]$InputObject
     )
-    
+
     process {
         $resultObject = [PSCustomObject]@{
             PSTypeName = "XoPowershell.Host"
@@ -35,7 +37,7 @@ function ConvertTo-XoHostObject {
             Version = $InputObject.software_version.product_version
             ProductBrand = $InputObject.software_version.product_brand
         }
-        
+
         return $resultObject
     }
 }
@@ -45,7 +47,7 @@ function Get-XoHost {
     .SYNOPSIS
         Get physical hosts from Xen Orchestra.
     .DESCRIPTION
-        Retrieves physical XCP-ng/XenServer hosts from Xen Orchestra. 
+        Retrieves physical XCP-ng/XenServer hosts from Xen Orchestra.
         Can retrieve specific hosts by their UUID or filter hosts by various criteria.
     .PARAMETER HostId
         The UUID(s) of the host(s) to retrieve.
@@ -69,10 +71,10 @@ function Get-XoHost {
         [ValidatePattern("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")]
         [Alias("HostUuid")]
         [string[]]$HostId,
-        
+
         [Parameter(ParameterSetName = "Filter")]
         [string]$Filter,
-        
+
         [Parameter(ParameterSetName = "Filter")]
         [Parameter(ParameterSetName = "All")]
         [int]$Limit
@@ -104,26 +106,26 @@ function Get-XoHost {
             }
         }
     }
-    
+
     end {
         if ($PSCmdlet.ParameterSetName -eq "All" -or $PSCmdlet.ParameterSetName -eq "Filter") {
             try {
-                Write-Verbose "Getting all hosts" 
+                Write-Verbose "Getting all hosts"
                 $hostUrls = Invoke-RestMethod -Uri "$script:XoHost/rest/v0/hosts" @script:XoRestParameters
-                
+
                 if ($hostUrls -and $hostUrls.Count -gt 0) {
                     Write-Verbose "Found $($hostUrls.Count) hosts"
-                    
+
                     # Apply limit if specified
                     $processLimit = if ($Limit -gt 0) { [Math]::Min($Limit, $hostUrls.Count) } else { $hostUrls.Count }
                     $processUrls = $hostUrls | Select-Object -First $processLimit
-                    
+
                     foreach ($hostUrl in $processUrls) {
                         # Skip null or empty URLs
                         if ([string]::IsNullOrEmpty($hostUrl)) {
                             continue
                         }
-                        
+
                         try {
                             # Extract the ID from the URL string
                             $match = [regex]::Match($hostUrl, "\/rest\/v0\/hosts\/([^\/]+)$")
@@ -137,7 +139,7 @@ function Get-XoHost {
                                         if ($hostDetail -is [string]) {
                                             $hostDetail = $hostDetail | ConvertFrom-Json -AsHashtable
                                         }
-                                        
+
                                         ConvertTo-XoHostObject $hostDetail
                                     }
                                 }
@@ -159,4 +161,4 @@ function Get-XoHost {
             }
         }
     }
-} 
+}

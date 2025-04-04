@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 function Remove-XoEmptyValues {
     param(
         [Parameter(Mandatory, ValueFromPipeline, Position = 0)][ValidateNotNull()][System.Collections.IDictionary]$InputObject

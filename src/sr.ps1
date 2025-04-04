@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 $script:XO_SR_FIELDS = "name_label,uuid,SR_type,content_type,allocationStrategy,size,physical_usage,usage,shared"
 
 function ConvertTo-XoSrObject {
@@ -45,7 +47,7 @@ function Get-XoSr {
         [Parameter(Mandatory, ValueFromPipelineByPropertyName, Position = 0, ParameterSetName = "SrId")]
         [ValidatePattern("[0-9a-z]+")]
         [string[]]$SrId,
-        
+
         [Parameter(ParameterSetName = "All")]
         [int]$Limit
     )
@@ -78,21 +80,21 @@ function Get-XoSr {
             try {
                 Write-Verbose "Getting all SRs"
                 $allSrUrls = Invoke-RestMethod -Uri "$script:XoHost/rest/v0/srs" @script:XoRestParameters
-                
+
                 if ($allSrUrls -and $allSrUrls.Count -gt 0) {
                     Write-Verbose "Found $($allSrUrls.Count) SRs"
-                    
+
                     # Apply limit if specified
                     $processLimit = if ($Limit -gt 0) { [Math]::Min($Limit, $allSrUrls.Count) } else { $allSrUrls.Count }
                     $processUrls = $allSrUrls | Select-Object -First $processLimit
-                    
+
                     foreach ($srUrl in $processUrls) {
                         # Skip null or empty URLs
                         if ([string]::IsNullOrEmpty($srUrl)) {
                             Write-Verbose "Skipping empty URL"
                             continue
                         }
-                        
+
                         try {
                             # Extract the ID from the URL string
                             $match = [regex]::Match($srUrl, "\/rest\/v0\/srs\/([^\/]+)$")
@@ -116,7 +118,7 @@ function Get-XoSr {
                             Write-Warning "Failed to process SR from URL $srUrl. Error: $_"
                         }
                     }
-                    
+
                     if ($allSrUrls.Count -gt $processLimit) {
                         Write-Warning "Only processed $processLimit of $($allSrUrls.Count) available SRs. Use -Limit parameter to adjust."
                     }

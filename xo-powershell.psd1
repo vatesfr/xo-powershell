@@ -2,32 +2,38 @@
     RootModule        = 'xo-powershell.psm1'
     ModuleVersion     = '1.0.0'
     GUID              = 'adaf591c-6abd-4084-89f9-d75a9096743d'
-    Author            = 'Your Name'
+    Author            = 'Vates'
     CompanyName       = 'Vates'
-    Copyright         = 'Copyright (c) Vates. All rights reserved - TBD'
+    Copyright         = 'Copyright (c) Vates.'
     Description       = 'Xen Orchestra PowerShell module'
     PowerShellVersion = '7.0'
+    PrivateData       = @{
+        PSData = @{
+            LicenseUri = 'https://spdx.org/licenses/Apache-2.0.html'
+            ProjectUri = 'https://github.com/vatesfr/xo-powershell'
+        }
+    }
     FunctionsToExport = @(
         # session
         "Test-XoSession"
         "Connect-XoSession"
         "Disconnect-XoSession"
-        
+
         # sr
         "Get-XoSr"
-        
+
         # task
         "Get-XoTask"
         "Wait-XoTask"
-        
+
         # vdi
         "Get-XoVdi"
         "Export-XoVdi"
-        
+
         # vdi-snapshot
         "Get-XoVdiSnapshot"
         "Export-XoVdiSnapshot"
-        
+
         # vm
         "Get-XoVm"
         "Get-XoVmVdi"
@@ -37,10 +43,10 @@
         "New-XoVmSnapshot"
         "Get-XoVmSnapshot"
         "Suspend-XoVm"
-        
+
         # server
         "Get-XoServer"
-        
+
         # host
         "Get-XoHost"
     )

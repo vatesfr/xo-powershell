@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 $script:XO_SERVER_FIELDS = "id,label,host,status,enabled,username,allowUnauthorized,readOnly,poolId,poolNameLabel,version"
 
 function ConvertTo-XoServerObject {
@@ -50,10 +52,10 @@ function Get-XoServer {
     param(
         [Parameter(Mandatory, ValueFromPipelineByPropertyName, Position = 0, ParameterSetName = "ServerUuid")]
         [string[]]$ServerUuid,
-        
+
         [Parameter(ParameterSetName = "Filter")]
         [string]$Filter,
-        
+
         [Parameter(ParameterSetName = "Filter")]
         [Parameter(ParameterSetName = "All")]
         [int]$Limit
@@ -88,18 +90,18 @@ function Get-XoServer {
             try {
                 Write-Verbose "Getting all servers"
                 $allServerUrls = Invoke-RestMethod -Uri "$script:XoHost/rest/v0/servers" @script:XoRestParameters
-                
+
                 if ($allServerUrls -and $allServerUrls.Count -gt 0) {
                     Write-Verbose "Found $($allServerUrls.Count) servers"
                     $processLimit = if ($Limit -gt 0) { [Math]::Min($Limit, $allServerUrls.Count) } else { $allServerUrls.Count }
                     $processUrls = $allServerUrls | Select-Object -First $processLimit
-                    
+
                     foreach ($serverUrl in $processUrls) {
                         if ([string]::IsNullOrEmpty($serverUrl)) {
                             Write-Verbose "Skipping empty URL"
                             continue
                         }
-                        
+
                         try {
                             $match = [regex]::Match($serverUrl, "\/rest\/v0\/servers\/([^\/]+)$")
                             if ($match.Success) {
@@ -122,7 +124,7 @@ function Get-XoServer {
                             Write-Warning "Failed to process server from URL $serverUrl. Error: $_"
                         }
                     }
-                    
+
                     if ($allServerUrls.Count -gt $processLimit) {
                         Write-Warning "Only processed $processLimit of $($allServerUrls.Count) available servers. Use -Limit parameter to adjust."
                     }
@@ -158,7 +160,7 @@ function Enable-XoServer {
         [Parameter(Mandatory, ValueFromPipelineByPropertyName)]
         [string[]]$ServerUuid
     )
-    
+
     process {
         foreach ($id in $ServerUuid) {
             if ($PSCmdlet.ShouldProcess($id, "Enable server")) {
@@ -195,7 +197,7 @@ function Disable-XoServer {
         [Parameter(Mandatory, ValueFromPipelineByPropertyName)]
         [string[]]$ServerUuid
     )
-    
+
     process {
         foreach ($id in $ServerUuid) {
             if ($PSCmdlet.ShouldProcess($id, "Disable server")) {
@@ -229,7 +231,7 @@ function Restart-XoServer {
         [Parameter(Mandatory, ValueFromPipelineByPropertyName)]
         [string[]]$ServerUuid
     )
-    
+
     process {
         foreach ($id in $ServerUuid) {
             if ($PSCmdlet.ShouldProcess($id, "Restart server toolstack")) {
@@ -244,4 +246,4 @@ function Restart-XoServer {
             }
         }
     }
-} 
+}

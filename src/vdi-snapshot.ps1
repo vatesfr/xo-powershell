@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 $script:XO_VDI_SNAPSHOT_FIELDS = "name_label,size,uuid,snapshot_time,snapshot_of,sr_uuid"
 
 function ConvertTo-XoVdiSnapshotObject {
@@ -52,10 +54,10 @@ function Get-XoVdiSnapshot {
         [ValidatePattern("[0-9a-z]+")]
         [Alias("VdiSnapshotUuid")]
         [string[]]$SnapshotId,
-        
+
         [Parameter(ParameterSetName = "Filter")]
         [string]$Filter,
-        
+
         [Parameter(ParameterSetName = "Filter")]
         [Parameter(ParameterSetName = "All")]
         [int]$Limit
@@ -87,23 +89,23 @@ function Get-XoVdiSnapshot {
             }
         }
     }
-    
+
     end {
         if ($PSCmdlet.ParameterSetName -eq "All" -or $PSCmdlet.ParameterSetName -eq "Filter") {
             try {
                 Write-Verbose "Getting all VDI snapshots"
                 $response = Invoke-RestMethod -Uri "$script:XoHost/rest/v0/vdi-snapshots" @script:XoRestParameters -Body $params
-                
+
                 if ($null -ne $response -and $response.Count -gt 0) {
                     Write-Verbose "Found $($response.Count) VDI snapshot URLs"
 
                     $maxToProcess = if ($Limit -gt 0) { $Limit } else { $response.Count }
                     Write-Verbose "Will process up to $maxToProcess snapshots"
-                    
+
                     $processedCount = 0
                     foreach ($item in $response) {
                         if ($processedCount -ge $maxToProcess) { break }
-                        
+
                         try {
                             $id = $null
 
@@ -121,7 +123,7 @@ function Get-XoVdiSnapshot {
                                 $id = $item.uuid
                                 Write-Verbose "Found UUID $id in object"
                             }
-                            
+
                             if ($id) {
                                 $snapshotData = Invoke-RestMethod -Uri "$script:XoHost/rest/v0/vdi-snapshots/$id" @script:XoRestParameters
                                 if ($snapshotData) {
@@ -136,7 +138,7 @@ function Get-XoVdiSnapshot {
                             Write-Warning "Failed to process VDI snapshot. $_"
                         }
                     }
-                    
+
                     Write-Verbose "Processed $processedCount VDI snapshots"
                 } else {
                     Write-Verbose "No VDI snapshots found"
@@ -175,35 +177,35 @@ function Export-XoVdiSnapshot {
         [ValidatePattern("[0-9a-z]+")]
         [Alias("VdiSnapshotUuid")]
         [string]$SnapshotId,
-        
+
         [Parameter(Mandatory)]
         [ValidateSet("vhd", "raw")]
         [string]$Format,
-        
+
         [Parameter(Mandatory)]
         [string]$OutFile,
-        
+
         [Parameter()]
         [switch]$PreferNbd,
-        
+
         [Parameter()]
         [int]$NbdConcurrency
     )
-    
+
     process {
         $queryParams = Remove-XoEmptyValues @{
             preferNbd = if ($PreferNbd) { "true" } else { $null }
             nbdConcurrency = $NbdConcurrency
         }
-        
+
         $queryString = if ($queryParams.Count -gt 0) {
             "?" + (($queryParams.GetEnumerator() | ForEach-Object { "$($_.Key)=$($_.Value)" }) -join "&")
         } else { "" }
-        
+
         $uri = "$script:XoHost/rest/v0/vdi-snapshots/$SnapshotId.$Format$queryString"
-        
+
         Write-Verbose "Exporting VDI snapshot $SnapshotId to $OutFile in $Format format"
         Invoke-RestMethod -Uri $uri @script:XoRestParameters -OutFile $OutFile
         Write-Verbose "Export completed successfully"
     }
-} 
+}
