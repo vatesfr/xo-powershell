@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 $script:XO_VM_FIELDS = "name_label,name_description,power_state,uuid,addresses,tags,memory,VIFs,snapshots,current_operations,auto_poweron,os_version,startTime,VCPUs_at_startup,PV_drivers_version"
 
 function ConvertTo-XoVmObject {
@@ -70,15 +72,15 @@ function Get-XoVm {
         [ValidateSet("Halted", "Paused", "Running", "Suspended")]
         [Alias("Status")]
         [string[]]$PowerState,
-        
+
         # Custom filter to apply
         [Parameter(ParameterSetName = "Filter")]
         [string]$Filter,
-        
+
         # Filter by tag
         [Parameter(ParameterSetName = "Filter")]
         [string[]]$Tag,
-        
+
         # Limit number of results
         [Parameter(ParameterSetName = "Filter")]
         [int]$Limit
@@ -101,19 +103,19 @@ function Get-XoVm {
     end {
         if ($PSCmdlet.ParameterSetName -eq "Filter") {
             $filterParts = @()
-            
+
             if ($PowerState) {
                 $filterParts += "power_state:|($($PowerState -join ' '))"
             }
-            
+
             if ($Tag) {
                 $filterParts += "tags:|($($Tag -join ' '))"
             }
-            
+
             if ($Filter) {
                 $filterParts += $Filter
             }
-            
+
             $combinedFilter = $filterParts -join " "
 
             $params = Remove-XoEmptyValues @{
@@ -310,7 +312,7 @@ function New-XoVmSnapshot {
         [Parameter(Mandatory, ValueFromPipelineByPropertyName)]
         [ValidateNotNullOrEmpty()]
         [string[]]$VmUuid,
-        
+
         [Parameter()]
         [Alias("NameLabel")]
         [string]$SnapshotName
@@ -419,10 +421,10 @@ function Get-XoVmSnapshot {
         [ValidatePattern("[0-9a-z]+")]
         [Alias("VmSnapshotUuid")]
         [string[]]$SnapshotId,
-        
+
         [Parameter(ParameterSetName = "Filter")]
         [string]$Filter,
-        
+
         [Parameter(ParameterSetName = "Filter")]
         [Parameter(ParameterSetName = "All")]
         [int]$Limit
@@ -455,26 +457,26 @@ function Get-XoVmSnapshot {
             }
         }
     }
-    
+
     end {
         if ($PSCmdlet.ParameterSetName -eq "All" -or $PSCmdlet.ParameterSetName -eq "Filter") {
             try {
                 Write-Verbose "Getting all VM snapshots"
                 $response = Invoke-RestMethod -Uri "$script:XoHost/rest/v0/vm-snapshots" @script:XoRestParameters -Body $params
-                
+
                 if ($null -ne $response -and $response.Count -gt 0) {
                     Write-Verbose "Found $($response.Count) VM snapshot URLs"
-                    
+
                     $maxToProcess = if ($Limit -gt 0) { $Limit } else { $response.Count }
                     Write-Verbose "Will process up to $maxToProcess snapshots"
-                    
+
                     $processedCount = 0
                     foreach ($item in $response) {
                         if ($processedCount -ge $maxToProcess) { break }
-                        
+
                         try {
                             $id = $null
-                            
+
                             if ($item -is [string]) {
                                 if ($item -match '\/vm-snapshots\/([^\/]+)(?:$|\?)') {
                                     $id = $matches[1]
@@ -489,7 +491,7 @@ function Get-XoVmSnapshot {
                                 $id = $item.uuid
                                 Write-Verbose "Found UUID $id in object"
                             }
-                            
+
                             if ($id) {
                                 $snapshotData = Invoke-RestMethod -Uri "$script:XoHost/rest/v0/vm-snapshots/$id" @script:XoRestParameters
                                 if ($snapshotData) {
@@ -504,7 +506,7 @@ function Get-XoVmSnapshot {
                             Write-Warning "Failed to process VM snapshot. $_"
                         }
                     }
-                    
+
                     Write-Verbose "Processed $processedCount VM snapshots"
                 } else {
                     Write-Verbose "No VM snapshots found"

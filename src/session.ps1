@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 function Test-XoSession {
     <#
     .SYNOPSIS
@@ -114,13 +116,13 @@ function Connect-XoSession {
         }
     }
 
-    # Save credentials if requested 
+    # Save credentials if requested
     if ($needsSave) {
         # TODO: Implement credential saving
     }
 
     $connectionSuccessful = Test-XoSession
-    
+
     if ($connectionSuccessful) {
         Write-Verbose "XoHost value: $script:XoHost"
         Write-Verbose "XoRestParameters: $($script:XoRestParameters.Headers | ConvertTo-Json -Compress)"

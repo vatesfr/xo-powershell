@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 $script:XO_TASK_FIELDS = "id,properties.method,start,status"
 
 function ConvertTo-XoTaskObject {

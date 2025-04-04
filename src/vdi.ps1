@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 $script:XO_VDI_FIELDS = "name_label,name_description,uuid,content_type,size,usage,physical_usage,snapshot_of,snapshots,sr,vbds,VMs,pool_master,tags"
 
 function ConvertTo-XoVdiObject {
@@ -5,7 +7,7 @@ function ConvertTo-XoVdiObject {
     .SYNOPSIS
         Convert VDI data from the API to a PowerShell object.
     .DESCRIPTION
-        Converts virtual disk image (VDI) data from the Xen Orchestra API to a PowerShell custom object 
+        Converts virtual disk image (VDI) data from the Xen Orchestra API to a PowerShell custom object
         with properly typed properties.
     .PARAMETER InputObject
         The VDI data from the API to convert.
@@ -19,7 +21,7 @@ function ConvertTo-XoVdiObject {
         [Parameter(Mandatory, ValueFromPipeline)]
         [object]$InputObject
     )
-    
+
     process {
         $props = @{
             PSTypeName = "XoPowershell.Vdi"
@@ -40,12 +42,12 @@ function ConvertTo-XoVdiObject {
             VirtualMachines = $InputObject.VMs
             Tags = $InputObject.tags
         }
-        
+
         # Add pool master if available
         if ($InputObject.pool_master) {
             $props["PoolMaster"] = $InputObject.pool_master
         }
-        
+
         [PSCustomObject]$props
     }
 }
@@ -84,23 +86,23 @@ function Get-XoVdi {
         [ValidatePattern("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")]
         [Alias("id", "uuid")]
         [string[]]$VdiId,
-        
+
         [Parameter(Mandatory, ParameterSetName = "SrFilter")]
         [ValidatePattern("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")]
         [string]$SrUuid,
-        
+
         [Parameter(ParameterSetName = "Filter")]
         [string]$Filter,
-        
+
         [Parameter(ParameterSetName = "All")]
         [Parameter(ParameterSetName = "SrFilter")]
         [Parameter(ParameterSetName = "Filter")]
         [int]$Limit
     )
-    
+
     begin {
         Write-Verbose "Getting VDIs from XO"
-        
+
         # Base parameters for API requests
         $params = Remove-XoEmptyValues @{
             fields = $script:XO_VDI_FIELDS
@@ -108,7 +110,7 @@ function Get-XoVdi {
             limit = $Limit
         }
     }
-    
+
     process {
         # Handle individual VDI retrieval
         if ($PSCmdlet.ParameterSetName -eq "VdiId") {
@@ -116,7 +118,7 @@ function Get-XoVdi {
                 try {
                     Write-Verbose "Getting VDI with ID $id"
                     $vdi = Invoke-RestMethod -Uri "$script:XoHost/rest/v0/vdis/$id" @script:XoRestParameters -Body $params
-                    
+
                     if ($vdi) {
                         ConvertTo-XoVdiObject $vdi
                     }
@@ -130,16 +132,16 @@ function Get-XoVdi {
             }
         }
     }
-    
+
     end {
         if ($PSCmdlet.ParameterSetName -ne "VdiId") {
             try {
                 Write-Verbose "Getting all VDIs"
                 $response = Invoke-RestMethod -Uri "$script:XoHost/rest/v0/vdis" @script:XoRestParameters -Body $params
-                
+
                 if ($null -ne $response -and $response.Count -gt 0) {
                     Write-Verbose "Found $($response.Count) VDI entries"
-                    
+
                     foreach ($item in $response) {
                         if ($item -is [string] -and $item -match '/vdis/([^/?]+)') {
                             $id = $matches[1]
@@ -153,7 +155,7 @@ function Get-XoVdi {
                             ConvertTo-XoVdiObject $item
                         }
                     }
-                } 
+                }
                 else {
                     Write-Verbose "No VDIs found matching criteria"
                 }
