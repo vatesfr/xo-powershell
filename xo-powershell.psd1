@@ -2,7 +2,7 @@
     RootModule        = 'xo-powershell.psm1'
     ModuleVersion     = '1.0.0'
     GUID              = 'adaf591c-6abd-4084-89f9-d75a9096743d'
-    Author            = 'Your Name'
+    Author            = 'Vates/fr'
     CompanyName       = 'Vates'
     Copyright         = 'Copyright (c) Vates. All rights reserved - TBD'
     Description       = 'Xen Orchestra PowerShell module'

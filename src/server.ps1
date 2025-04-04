@@ -1,12 +1,24 @@
 $script:XO_SERVER_FIELDS = "id,label,host,status,enabled,username,allowUnauthorized,readOnly,poolId,poolNameLabel,version"
 
 function ConvertTo-XoServerObject {
+    <#
+    .SYNOPSIS
+        Convert a server object from the API to a PowerShell object.
+    .DESCRIPTION
+        Convert a server object from the API to a PowerShell object with proper properties and types.
+    .PARAMETER InputObject
+        The server object from the API.
+    #>
+    [CmdletBinding()]
+    [OutputType("XoPowershell.Server")]
     param(
-        [Parameter(Mandatory, ValueFromPipeline, Position = 0)]$InputObject
+        [Parameter(Mandatory, ValueFromPipeline, Position = 0)]
+        $InputObject
     )
 
     process {
         $props = @{
+            PSTypeName = "XoPowershell.Server"
             ServerUuid = $InputObject.id
             Name = $InputObject.label
             Address = $InputObject.host
@@ -19,7 +31,67 @@ function ConvertTo-XoServerObject {
             PoolName = $InputObject.poolNameLabel
             Version = $InputObject.version
         }
-        Set-XoObject $InputObject -TypeName XoPowershell.Server -Properties $props
+        
+        [PSCustomObject]$props
+    }
+}
+
+function Get-XoSingleServerById {
+    param (
+        [string]$ServerId,
+        [hashtable]$Params
+    )
+    
+    try {
+        $uri = "$script:XoHost/rest/v0/servers/$ServerId"
+        Write-Verbose "Getting server with ID $ServerId from $uri"
+        
+        $serverData = Invoke-RestMethod -Uri $uri @script:XoRestParameters
+        if ($serverData -is [string]) {
+            $serverData = $serverData | ConvertFrom-Json -AsHashTable
+        }
+        
+        if ($serverData) {
+            return ConvertTo-XoServerObject -InputObject $serverData
+        }
+    } catch {
+        $errorMessage = $_
+        throw "Failed to retrieve server with ID $ServerId. Error: $errorMessage"
+    }
+    return $null
+}
+
+function Get-XoServerDetailFromUrl {
+    param(
+        [string]$ServerUrl
+    )
+    
+    if ([string]::IsNullOrEmpty($ServerUrl)) {
+        return $null
+    }
+    
+    $match = [regex]::Match($ServerUrl, "\/rest\/v0\/servers\/([^\/]+)$")
+    if (!$match.Success) {
+        Write-Warning "URL doesn't match expected pattern: $ServerUrl"
+        return $null
+    }
+    
+    $id = $match.Groups[1].Value
+    if ([string]::IsNullOrEmpty($id)) {
+        Write-Warning "Failed to extract valid ID from URL: $ServerUrl"
+        return $null
+    }
+    
+    try {
+        $serverDetail = Invoke-RestMethod -Uri "$script:XoHost/rest/v0/servers/$id" @script:XoRestParameters
+        if ($serverDetail -is [string]) {
+            $serverDetail = $serverDetail | ConvertFrom-Json -AsHashTable
+        }
+        return $serverDetail
+    } catch {
+        $errorMessage = $_
+        Write-Warning "Error fetching server detail for ID $id`: $errorMessage"
+        return $null
     }
 }
 
@@ -35,16 +107,19 @@ function Get-XoServer {
     .PARAMETER Filter
         Filter to apply to the server query.
     .PARAMETER Limit
-        Maximum number of results to return.
+        Maximum number of results to return. Default is 25 if not specified.
     .EXAMPLE
         Get-XoServer
-        Returns all servers.
+        Returns up to 25 servers.
+    .EXAMPLE
+        Get-XoServer -Limit 0
+        Returns all servers without limit.
     .EXAMPLE
         Get-XoServer -ServerUuid "12345678-abcd-1234-abcd-1234567890ab"
         Returns the server with the specified UUID.
     .EXAMPLE
-        Get-XoServer -Filter "power_state:running"
-        Returns all running servers.
+        Get-XoServer -Filter "status:connected"
+        Returns connected servers (up to default limit).
     #>
     [CmdletBinding(DefaultParameterSetName = "All")]
     param(
@@ -56,192 +131,62 @@ function Get-XoServer {
         
         [Parameter(ParameterSetName = "Filter")]
         [Parameter(ParameterSetName = "All")]
-        [int]$Limit
+        [int]$Limit = $(if ($null -ne $script:XO_DEFAULT_LIMIT) { $script:XO_DEFAULT_LIMIT } else { 25 })
     )
 
-    begin {
-        $params = @{}
-        if ($PSBoundParameters.ContainsKey('Filter')) {
-            $params['filter'] = $Filter
-        }
-        if ($PSBoundParameters.ContainsKey('Limit')) {
-            $params['limit'] = $Limit
+    if (-not $script:XoHost -or -not $script:XoRestParameters) {
+        throw "Not connected to Xen Orchestra. Call Connect-XoSession first."
+    }
+    
+    $params = @{}
+    if ($PSBoundParameters.ContainsKey('Filter')) {
+        $params['filter'] = $Filter
+    }
+    
+    if ($Limit -ne 0 -and ($PSCmdlet.ParameterSetName -eq "Filter" -or $PSCmdlet.ParameterSetName -eq "All")) {
+        $params['limit'] = $Limit
+        if (!$PSBoundParameters.ContainsKey('Limit')) {
+            Write-Warning "No limit specified. Using default limit of $Limit. Use -Limit 0 for unlimited results."
         }
     }
-
-    process {
-        if ($PSCmdlet.ParameterSetName -eq "ServerUuid") {
-            foreach ($id in $ServerUuid) {
-                try {
-                    Write-Verbose "Getting server with ID $id"
-                    $serverData = Invoke-RestMethod -Uri "$script:XoHost/rest/v0/servers/$id" @script:XoRestParameters
-                    if ($serverData) {
-                        ConvertTo-XoServerObject $serverData
-                    }
-                }
-                catch {
-                    Write-Error "Failed to retrieve server with ID $id. Error: $_"
-                }
+    
+    if ($PSCmdlet.ParameterSetName -eq "ServerUuid") {
+        foreach ($id in $ServerUuid) {
+            Get-XoSingleServerById -ServerId $id -Params $params
+        }
+        return
+    }
+    
+    try {
+        $uri = "$script:XoHost/rest/v0/servers"
+        Write-Verbose "Getting servers from $uri with parameters: $($params | ConvertTo-Json -Compress)"
+        
+        $serversResponse = Invoke-RestMethod -Uri $uri @script:XoRestParameters -Body ($params | ConvertTo-Json -Compress) -Method Get
+        
+        if (!$serversResponse -or $serversResponse.Count -eq 0) {
+            Write-Verbose "No servers found"
+            return
+        }
+        
+        $serversToProcess = $serversResponse
+        if ($Limit -gt 0 -and $serversResponse.Count -gt $Limit) {
+            $serversToProcess = $serversResponse[0..($Limit-1)]
+        }
+        
+        foreach ($serverUrl in $serversToProcess) {
+            $serverDetail = Get-XoServerDetailFromUrl -ServerUrl $serverUrl
+            if ($serverDetail) {
+                $serverObj = ConvertTo-XoServerObject -InputObject $serverDetail
+                Write-Output $serverObj
             }
         }
-        else {
-            try {
-                Write-Verbose "Getting all servers"
-                $allServerUrls = Invoke-RestMethod -Uri "$script:XoHost/rest/v0/servers" @script:XoRestParameters
-                
-                if ($allServerUrls -and $allServerUrls.Count -gt 0) {
-                    Write-Verbose "Found $($allServerUrls.Count) servers"
-                    $processLimit = if ($Limit -gt 0) { [Math]::Min($Limit, $allServerUrls.Count) } else { $allServerUrls.Count }
-                    $processUrls = $allServerUrls | Select-Object -First $processLimit
-                    
-                    foreach ($serverUrl in $processUrls) {
-                        if ([string]::IsNullOrEmpty($serverUrl)) {
-                            Write-Verbose "Skipping empty URL"
-                            continue
-                        }
-                        
-                        try {
-                            $match = [regex]::Match($serverUrl, "\/rest\/v0\/servers\/([^\/]+)$")
-                            if ($match.Success) {
-                                $id = $match.Groups[1].Value
-                                if (![string]::IsNullOrEmpty($id)) {
-                                    $serverDetail = Invoke-RestMethod -Uri "$script:XoHost/rest/v0/servers/$id" @script:XoRestParameters
-                                    if ($serverDetail) {
-                                        ConvertTo-XoServerObject $serverDetail
-                                    }
-                                }
-                                else {
-                                    Write-Warning "Failed to extract valid ID from URL: $serverUrl"
-                                }
-                            }
-                            else {
-                                Write-Warning "URL doesn't match expected pattern: $serverUrl"
-                            }
-                        }
-                        catch {
-                            Write-Warning "Failed to process server from URL $serverUrl. Error: $_"
-                        }
-                    }
-                    
-                    if ($allServerUrls.Count -gt $processLimit) {
-                        Write-Warning "Only processed $processLimit of $($allServerUrls.Count) available servers. Use -Limit parameter to adjust."
-                    }
-                }
-                else {
-                    Write-Verbose "No servers found"
-                }
-            }
-            catch {
-                Write-Error "Failed to retrieve servers: $_"
-            }
+    } catch {
+        $errorMessage = $_.Exception.Message
+        $errorMsg = "Failed to list servers. Error: $errorMessage"
+        if ($_.Exception.Response) {
+            $responseContent = $_.Exception.Response.Content | Out-String
+            $errorMsg += " Response: $responseContent"
         }
+        throw $errorMsg
     }
 }
-
-function Enable-XoServer {
-    <#
-    .SYNOPSIS
-        Enable a server in Xen Orchestra.
-    .DESCRIPTION
-        Enables a server that has been previously disabled in Xen Orchestra.
-    .PARAMETER ServerUuid
-        The UUID of the server to enable.
-    .EXAMPLE
-        Enable-XoServer -ServerUuid "12345678-abcd-1234-abcd-1234567890ab"
-        Enables the server with the specified UUID.
-    .EXAMPLE
-        Get-XoServer | Where-Object { -not $_.Enabled } | Enable-XoServer
-        Enables all disabled servers.
-    #>
-    [CmdletBinding(SupportsShouldProcess)]
-    param(
-        [Parameter(Mandatory, ValueFromPipelineByPropertyName)]
-        [string[]]$ServerUuid
-    )
-    
-    process {
-        foreach ($id in $ServerUuid) {
-            if ($PSCmdlet.ShouldProcess($id, "Enable server")) {
-                try {
-                    Write-Verbose "Enabling server $id"
-                    Invoke-RestMethod -Uri "$script:XoHost/rest/v0/servers/$id/enable" -Method Post @script:XoRestParameters
-                    Write-Verbose "Server enabled successfully"
-                }
-                catch {
-                    Write-Error "Failed to enable server $id. Error: $_"
-                }
-            }
-        }
-    }
-}
-
-function Disable-XoServer {
-    <#
-    .SYNOPSIS
-        Disable a server in Xen Orchestra.
-    .DESCRIPTION
-        Disables a server in Xen Orchestra. Disabled servers are not accessed by Xen Orchestra.
-    .PARAMETER ServerUuid
-        The UUID of the server to disable.
-    .EXAMPLE
-        Disable-XoServer -ServerUuid "12345678-abcd-1234-abcd-1234567890ab"
-        Disables the server with the specified UUID.
-    .EXAMPLE
-        Get-XoServer | Where-Object { $_.Enabled } | Disable-XoServer
-        Disables all enabled servers.
-    #>
-    [CmdletBinding(SupportsShouldProcess, ConfirmImpact = "Medium")]
-    param(
-        [Parameter(Mandatory, ValueFromPipelineByPropertyName)]
-        [string[]]$ServerUuid
-    )
-    
-    process {
-        foreach ($id in $ServerUuid) {
-            if ($PSCmdlet.ShouldProcess($id, "Disable server")) {
-                try {
-                    Write-Verbose "Disabling server $id"
-                    Invoke-RestMethod -Uri "$script:XoHost/rest/v0/servers/$id/disable" -Method Post @script:XoRestParameters
-                    Write-Verbose "Server disabled successfully"
-                }
-                catch {
-                    Write-Error "Failed to disable server $id. Error: $_"
-                }
-            }
-        }
-    }
-}
-
-function Restart-XoServer {
-    <#
-    .SYNOPSIS
-        Restart a server's toolstack in Xen Orchestra.
-    .DESCRIPTION
-        Restarts the XAPI toolstack on the specified server.
-    .PARAMETER ServerUuid
-        The UUID of the server to restart the toolstack on.
-    .EXAMPLE
-        Restart-XoServer -ServerUuid "12345678-abcd-1234-abcd-1234567890ab"
-        Restarts the toolstack on the server with the specified UUID.
-    #>
-    [CmdletBinding(SupportsShouldProcess, ConfirmImpact = "High")]
-    param(
-        [Parameter(Mandatory, ValueFromPipelineByPropertyName)]
-        [string[]]$ServerUuid
-    )
-    
-    process {
-        foreach ($id in $ServerUuid) {
-            if ($PSCmdlet.ShouldProcess($id, "Restart server toolstack")) {
-                try {
-                    Write-Verbose "Restarting toolstack on server $id"
-                    Invoke-RestMethod -Uri "$script:XoHost/rest/v0/servers/$id/restart-toolstack" -Method Post @script:XoRestParameters
-                    Write-Verbose "Toolstack restart initiated"
-                }
-                catch {
-                    Write-Error "Failed to restart toolstack for server $id. Error: $_"
-                }
-            }
-        }
-    }
-} 

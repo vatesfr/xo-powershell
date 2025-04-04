@@ -21,11 +21,53 @@
                                 <PropertyName>PowerState</PropertyName>
                             </TableColumnItem>
                             <TableColumnItem>
-                                <PropertyName>IpAddresses</PropertyName>
+                                <ScriptBlock>
+                                    try { $_.CPUs } catch { "" }
+                                </ScriptBlock>
+                                <Alignment>Right</Alignment>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <ScriptBlock>
+                                    if ($null -eq $_.Memory) { "" }
+                                    elseif ($_.Memory.PSObject.Properties.Name -contains 'size') { $_.Memory.size } 
+                                    else { "" }
+                                </ScriptBlock>
+                                <Alignment>Right</Alignment>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>Description</PropertyName>
                             </TableColumnItem>
                         </TableColumnItems>
                     </TableRowEntry>
                 </TableRowEntries>
+                <TableHeaders>
+                    <TableColumnHeader>
+                        <Label>ID</Label>
+                        <Width>36</Width>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Name</Label>
+                        <Width>20</Width>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Power State</Label>
+                        <Width>12</Width>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>CPUs</Label>
+                        <Width>5</Width>
+                        <Alignment>Right</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Memory</Label>
+                        <Width>15</Width>
+                        <Alignment>Right</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Description</Label>
+                        <Width>30</Width>
+                    </TableColumnHeader>
+                </TableHeaders>
             </TableControl>
         </View>
     </ViewDefinitions>
