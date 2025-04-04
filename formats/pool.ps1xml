@@ -3,47 +3,32 @@
     xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/PowerShell/PowerShell/master/src/Schemas/Format.xsd">
     <ViewDefinitions>
         <View>
-            <Name>XoVm</Name>
+            <Name>XoPowershell.Pool</Name>
             <ViewSelectedBy>
-                <TypeName>XoVm</TypeName>
+                <TypeName>XoPowershell.Pool</TypeName>
             </ViewSelectedBy>
             <TableControl>
                 <TableRowEntries>
                     <TableRowEntry>
                         <TableColumnItems>
                             <TableColumnItem>
+                                <PropertyName>PoolUuid</PropertyName>
+                            </TableColumnItem>
+                            <TableColumnItem>
                                 <PropertyName>Name</PropertyName>
                             </TableColumnItem>
                             <TableColumnItem>
-                                <PropertyName>PowerState</PropertyName>
+                                <PropertyName>CpuCores</PropertyName>
                             </TableColumnItem>
                             <TableColumnItem>
-                                <PropertyName>IpAddresses</PropertyName>
+                                <PropertyName>PlatformVersion</PropertyName>
                             </TableColumnItem>
                             <TableColumnItem>
-                                <PropertyName>VmUuid</PropertyName>
+                                <PropertyName>HAEnabled</PropertyName>
                             </TableColumnItem>
                         </TableColumnItems>
                     </TableRowEntry>
                 </TableRowEntries>
-                <TableHeaders>
-                    <TableColumnHeader>
-                        <Label>Name</Label>
-                        <Width>20</Width>
-                    </TableColumnHeader>
-                    <TableColumnHeader>
-                        <Label>PowerState</Label>
-                        <Width>12</Width>
-                    </TableColumnHeader>
-                    <TableColumnHeader>
-                        <Label>IP Addresses</Label>
-                        <Width>15</Width>
-                    </TableColumnHeader>
-                    <TableColumnHeader>
-                        <Label>VmUuid</Label>
-                        <Width>36</Width>
-                    </TableColumnHeader>
-                </TableHeaders>
             </TableControl>
         </View>
     </ViewDefinitions>
