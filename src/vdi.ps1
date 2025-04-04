@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
-$script:XO_VDI_FIELDS = "name_label,name_description,uuid,content_type,size,usage,physical_usage,snapshot_of,snapshots,sr,vbds,VMs,pool_master,tags"
+$script:XO_VDI_FIELDS = "name_label,name_description,uuid,VDI_type,size,usage,physical_usage,snapshot_of,snapshots,sr,vbds,VMs,pool_master,tags"
 
 function ConvertTo-XoVdiObject {
     <#
@@ -28,13 +28,10 @@ function ConvertTo-XoVdiObject {
             VdiUuid = $InputObject.uuid
             Name = $InputObject.name_label
             Description = $InputObject.name_description
-            Type = $InputObject.content_type
-            Size = [long]$InputObject.size
-            SizeHuman = Format-XoSize $InputObject.size
-            Usage = [long]$InputObject.usage
-            UsageHuman = Format-XoSize $InputObject.usage
-            PhysicalUsage = [long]$InputObject.physical_usage
-            PhysicalUsageHuman = Format-XoSize $InputObject.physical_usage
+            Type = $InputObject.VDI_type
+            Size = $InputObject.size
+            Usage = $InputObject.usage
+            PhysicalUsage = $InputObject.physical_usage
             SnapshotOf = $InputObject.snapshot_of
             Snapshots = $InputObject.snapshots
             StorageRepository = $InputObject.sr
@@ -44,12 +41,52 @@ function ConvertTo-XoVdiObject {
         }
 
         # Add pool master if available
+        
         if ($InputObject.pool_master) {
             $props["PoolMaster"] = $InputObject.pool_master
         }
 
         [PSCustomObject]$props
     }
+}
+
+function Get-XoSingleVdiById {
+    param (
+        [string]$VdiId,
+        [hashtable]$Params
+    )
+    
+    try {
+        Write-Verbose "Getting VDI with ID $VdiId"
+        $vdi = Invoke-RestMethod -Uri "$script:XoHost/rest/v0/vdis/$VdiId" @script:XoRestParameters -Body $Params
+        
+        if ($vdi) {
+            return ConvertTo-XoVdiObject $vdi
+        }
+    } catch {
+        throw "Failed to retrieve VDI with ID $VdiId. Error: $_"
+    }
+    return $null
+}
+
+function Get-XoVdiIdFromItem {
+    param (
+        [Parameter(Mandatory)]
+        $Item
+    )
+    
+    if ($Item -is [string] -and $Item -match '/vdis/([^/?]+)') {
+        return $matches[1]
+    }
+    elseif ($Item.PSObject.Properties.Name -contains 'id') {
+        return $Item.id
+    }
+    elseif ($Item.PSObject.Properties.Name -contains 'uuid') {
+        return $Item.uuid
+    }
+    
+    Write-Verbose "Could not extract ID from item: $Item"
+    return $null
 }
 
 function Get-XoVdi {
@@ -97,76 +134,68 @@ function Get-XoVdi {
         [Parameter(ParameterSetName = "All")]
         [Parameter(ParameterSetName = "SrFilter")]
         [Parameter(ParameterSetName = "Filter")]
-        [int]$Limit
+        [int]$Limit = $(if ($null -ne $script:XO_DEFAULT_LIMIT) { $script:XO_DEFAULT_LIMIT } else { 25 })
     )
+    
+    if (-not $script:XoHost -or -not $script:XoRestParameters) {
+        throw "Not connected to Xen Orchestra. Call Connect-XoSession first."
+    }
+    
+    $params = @{
+        fields = $script:XO_VDI_FIELDS
+    }
+    
+    if ($PSCmdlet.ParameterSetName -eq "SrFilter") {
+        $params['filter'] = "sr:$SrUuid"
+    } elseif ($PSCmdlet.ParameterSetName -eq "Filter") {
+        $params['filter'] = $Filter
+    }
+    
+    if ($Limit -ne 0 -and $PSCmdlet.ParameterSetName -ne "VdiId") {
+        $params['limit'] = $Limit
+        if (!$PSBoundParameters.ContainsKey('Limit')) {
+            Write-Warning "No limit specified. Using default limit of $Limit. Use -Limit 0 for unlimited results."
+        }
+    }
 
-    begin {
-        Write-Verbose "Getting VDIs from XO"
-<<<<<<< HEAD
-
-        # Base parameters for API requests
-=======
+    if ($PSCmdlet.ParameterSetName -eq "VdiId") {
+        foreach ($id in $VdiId) {
+            Get-XoSingleVdiById -VdiId $id -Params $params
+        }
+        return
+    }
+    
+    try {
+        Write-Verbose "Getting all VDIs with parameters: $($params | ConvertTo-Json -Compress)"
+        $uri = "$script:XoHost/rest/v0/vdis"
+        $response = Invoke-RestMethod -Uri $uri @script:XoRestParameters -Body ($params | ConvertTo-Json -Compress)
         
->>>>>>> b4b1752 (apply Tu's recommandation.)
-        $params = Remove-XoEmptyValues @{
-            fields = $script:XO_VDI_FIELDS
-            filter = if ($PSCmdlet.ParameterSetName -eq "SrFilter") { "sr:$SrUuid" } elseif ($PSCmdlet.ParameterSetName -eq "Filter") { $Filter } else { $null }
-            limit = $Limit
+        if ($null -eq $response -or $response.Count -eq 0) {
+            Write-Verbose "No VDIs found matching criteria"
+            return
         }
-    }
+        
+        Write-Verbose "Found $($response.Count) VDI entries"
 
-    process {
-        if ($PSCmdlet.ParameterSetName -eq "VdiId") {
-            foreach ($id in $VdiId) {
-                try {
-                    Write-Verbose "Getting VDI with ID $id"
-                    $vdi = Invoke-RestMethod -Uri "$script:XoHost/rest/v0/vdis/$id" @script:XoRestParameters -Body $params
+        $vdisToProcess = $response
+        if ($Limit -gt 0 -and $response.Count -gt $Limit) {
+            $vdisToProcess = $response[0..($Limit-1)]
+        }
 
-                    if ($vdi) {
-                        ConvertTo-XoVdiObject $vdi
-                    }
-                    else {
-                        throw "No VDI found with ID $id"
-                    }
-                }
-                catch {
-                    throw "Failed to retrieve VDI with ID $id. Error: $_"
+        foreach ($item in $vdisToProcess) {
+            if ($item -is [System.Management.Automation.PSObject] -or $item -is [Hashtable]) {
+                ConvertTo-XoVdiObject $item
+            }
+            else {
+                $id = Get-XoVdiIdFromItem -Item $item
+                if ($id) {
+                    Get-XoSingleVdiById -VdiId $id -Params $params
                 }
             }
         }
     }
-
-    end {
-        if ($PSCmdlet.ParameterSetName -ne "VdiId") {
-            try {
-                Write-Verbose "Getting all VDIs"
-                $response = Invoke-RestMethod -Uri "$script:XoHost/rest/v0/vdis" @script:XoRestParameters -Body $params
-
-                if ($null -ne $response -and $response.Count -gt 0) {
-                    Write-Verbose "Found $($response.Count) VDI entries"
-
-                    foreach ($item in $response) {
-                        if ($item -is [string] -and $item -match '/vdis/([^/?]+)') {
-                            $id = $matches[1]
-                            Write-Verbose "Extracted VDI ID: $id"
-                            $vdiData = Invoke-RestMethod -Uri "$script:XoHost/rest/v0/vdis/$id" @script:XoRestParameters
-                            if ($vdiData) {
-                                ConvertTo-XoVdiObject $vdiData
-                            }
-                        }
-                        elseif ($item -is [System.Management.Automation.PSObject]) {
-                            ConvertTo-XoVdiObject $item
-                        }
-                    }
-                }
-                else {
-                    Write-Verbose "No VDIs found matching criteria"
-                }
-            }
-            catch {
-                throw "Failed to retrieve VDIs. Error: $_"
-            }
-        }
+    catch {
+        throw "Failed to retrieve VDIs. Error: $_"
     }
 }
 
@@ -218,10 +247,8 @@ function Export-XoVdi {
 
         Wait-XoTask -TaskId $taskId
 
-        # Get the download URL
         $downloadUrl = Invoke-XoApi -Method Get -Path "vdis/$VdiId/export" | Select-Object -ExpandProperty url
 
-        # Download the file
         Invoke-WebRequest -Uri $downloadUrl -OutFile $OutFile
         Write-Verbose "VDI exported to: $OutFile"
     }

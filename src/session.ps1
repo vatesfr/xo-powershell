@@ -1,5 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
+$script:XO_DEFAULT_LIMIT = 25
+
 function Test-XoSession {
     <#
     .SYNOPSIS
@@ -13,9 +15,9 @@ function Test-XoSession {
     [CmdletBinding()]
     param()
 
-    # Test connection by attempting to get tasks
+    # Test connection by attempting to get tasks with a minimal limit
     try {
-        Get-XoTask | Out-Null
+        Get-XoTask -Limit 1 | Out-Null
         Write-Verbose "Successful connection to Xen Orchestra - $script:XoHost"
         return $true
     }
@@ -161,3 +163,42 @@ function Disconnect-XoSession {
     $script:XoRestParameters = $null
 }
 New-Alias -Name Disconnect-XenOrchestra -Value Disconnect-XoSession
+
+function Set-XoDefaultLimit {
+    <#
+    .SYNOPSIS
+        Set the default limit for XO query cmdlets.
+    .DESCRIPTION
+        Sets the default limit for all Get-Xo* cmdlets that support a -Limit parameter.
+        This setting persists for the current PowerShell session.
+    .PARAMETER Limit
+        The default limit to use. Set to 0 for unlimited results.
+    .EXAMPLE
+        Set-XoDefaultLimit -Limit 50
+        Sets the default limit to 50 items for all query cmdlets.
+    .EXAMPLE
+        Set-XoDefaultLimit -Limit 0
+        Sets cmdlets to return all items by default.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [int]$Limit
+    )
+
+    # Initialize the variable if it doesn't exist
+    if ($null -eq $script:XO_DEFAULT_LIMIT) {
+        $script:XO_DEFAULT_LIMIT = 25
+        Write-Verbose "Default limit was not initialized, setting initial value to 25"
+    }
+
+    # Set the new limit
+    $oldLimit = $script:XO_DEFAULT_LIMIT
+    $script:XO_DEFAULT_LIMIT = $Limit
+    
+    if ($Limit -eq 0) {
+        Write-Verbose "Default limit for XO queries changed from $oldLimit to unlimited (0)"
+    } else {
+        Write-Verbose "Default limit for XO queries changed from $oldLimit to $Limit"
+    }
+}

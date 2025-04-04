@@ -3,12 +3,24 @@
 $script:XO_SERVER_FIELDS = "id,label,host,status,enabled,username,allowUnauthorized,readOnly,poolId,poolNameLabel,version"
 
 function ConvertTo-XoServerObject {
+    <#
+    .SYNOPSIS
+        Convert a server object from the API to a PowerShell object.
+    .DESCRIPTION
+        Convert a server object from the API to a PowerShell object with proper properties and types.
+    .PARAMETER InputObject
+        The server object from the API.
+    #>
+    [CmdletBinding()]
+    [OutputType("XoPowershell.Server")]
     param(
-        [Parameter(Mandatory, ValueFromPipeline, Position = 0)]$InputObject
+        [Parameter(Mandatory, ValueFromPipeline, Position = 0)]
+        $InputObject
     )
 
     process {
         $props = @{
+            PSTypeName = "XoPowershell.Server"
             ServerUuid = $InputObject.id
             Name = $InputObject.label
             Address = $InputObject.host
@@ -21,7 +33,67 @@ function ConvertTo-XoServerObject {
             PoolName = $InputObject.poolNameLabel
             Version = $InputObject.version
         }
-        Set-XoObject $InputObject -TypeName XoPowershell.Server -Properties $props
+        
+        [PSCustomObject]$props
+    }
+}
+
+function Get-XoSingleServerById {
+    param (
+        [string]$ServerId,
+        [hashtable]$Params
+    )
+    
+    try {
+        $uri = "$script:XoHost/rest/v0/servers/$ServerId"
+        Write-Verbose "Getting server with ID $ServerId from $uri"
+        
+        $serverData = Invoke-RestMethod -Uri $uri @script:XoRestParameters
+        if ($serverData -is [string]) {
+            $serverData = $serverData | ConvertFrom-Json -AsHashTable
+        }
+        
+        if ($serverData) {
+            return ConvertTo-XoServerObject -InputObject $serverData
+        }
+    } catch {
+        $errorMessage = $_
+        throw "Failed to retrieve server with ID $ServerId. Error: $errorMessage"
+    }
+    return $null
+}
+
+function Get-XoServerDetailFromUrl {
+    param(
+        [string]$ServerUrl
+    )
+    
+    if ([string]::IsNullOrEmpty($ServerUrl)) {
+        return $null
+    }
+    
+    $match = [regex]::Match($ServerUrl, "\/rest\/v0\/servers\/([^\/]+)$")
+    if (!$match.Success) {
+        Write-Warning "URL doesn't match expected pattern: $ServerUrl"
+        return $null
+    }
+    
+    $id = $match.Groups[1].Value
+    if ([string]::IsNullOrEmpty($id)) {
+        Write-Warning "Failed to extract valid ID from URL: $ServerUrl"
+        return $null
+    }
+    
+    try {
+        $serverDetail = Invoke-RestMethod -Uri "$script:XoHost/rest/v0/servers/$id" @script:XoRestParameters
+        if ($serverDetail -is [string]) {
+            $serverDetail = $serverDetail | ConvertFrom-Json -AsHashTable
+        }
+        return $serverDetail
+    } catch {
+        $errorMessage = $_
+        Write-Warning "Error fetching server detail for ID $id`: $errorMessage"
+        return $null
     }
 }
 
@@ -61,82 +133,62 @@ function Get-XoServer {
 
         [Parameter(ParameterSetName = "Filter")]
         [Parameter(ParameterSetName = "All")]
-        [int]$Limit = 25
+        [int]$Limit = $(if ($null -ne $script:XO_DEFAULT_LIMIT) { $script:XO_DEFAULT_LIMIT } else { 25 })
     )
 
-    begin {
-        $params = @{}
-        if ($PSBoundParameters.ContainsKey('Filter')) {
-            $params['filter'] = $Filter
-        }
-        
-        if ($Limit -ne 0) {
-            $params['limit'] = $Limit
-            if (!$PSBoundParameters.ContainsKey('Limit')) {
-                Write-Warning "No limit specified. Using default limit of 25. Use -Limit 0 for unlimited results."
-            }
+    if (-not $script:XoHost -or -not $script:XoRestParameters) {
+        throw "Not connected to Xen Orchestra. Call Connect-XoSession first."
+    }
+    
+    $params = @{}
+    if ($PSBoundParameters.ContainsKey('Filter')) {
+        $params['filter'] = $Filter
+    }
+    
+    if ($Limit -ne 0 -and ($PSCmdlet.ParameterSetName -eq "Filter" -or $PSCmdlet.ParameterSetName -eq "All")) {
+        $params['limit'] = $Limit
+        if (!$PSBoundParameters.ContainsKey('Limit')) {
+            Write-Warning "No limit specified. Using default limit of $Limit. Use -Limit 0 for unlimited results."
         }
     }
-
-    process {
-        if ($PSCmdlet.ParameterSetName -eq "ServerUuid") {
-            foreach ($id in $ServerUuid) {
-                try {
-                    Write-Verbose "Getting server with ID $id"
-                    $serverData = Invoke-RestMethod -Uri "$script:XoHost/rest/v0/servers/$id" @script:XoRestParameters
-                    if ($serverData) {
-                        ConvertTo-XoServerObject $serverData
-                    }
-                }
-                catch {
-                    throw "Failed to retrieve server with ID $id. Error: $_"
-                }
+    
+    if ($PSCmdlet.ParameterSetName -eq "ServerUuid") {
+        foreach ($id in $ServerUuid) {
+            Get-XoSingleServerById -ServerId $id -Params $params
+        }
+        return
+    }
+    
+    try {
+        $uri = "$script:XoHost/rest/v0/servers"
+        Write-Verbose "Getting servers from $uri with parameters: $($params | ConvertTo-Json -Compress)"
+        
+        $serversResponse = Invoke-RestMethod -Uri $uri @script:XoRestParameters -Body ($params | ConvertTo-Json -Compress) -Method Get
+        
+        if (!$serversResponse -or $serversResponse.Count -eq 0) {
+            Write-Verbose "No servers found"
+            return
+        }
+        
+        $serversToProcess = $serversResponse
+        if ($Limit -gt 0 -and $serversResponse.Count -gt $Limit) {
+            $serversToProcess = $serversResponse[0..($Limit-1)]
+        }
+        
+        foreach ($serverUrl in $serversToProcess) {
+            $serverDetail = Get-XoServerDetailFromUrl -ServerUrl $serverUrl
+            if ($serverDetail) {
+                $serverObj = ConvertTo-XoServerObject -InputObject $serverDetail
+                Write-Output $serverObj
             }
         }
-        else {
-            try {
-                Write-Verbose "Getting servers with parameters: $($params | ConvertTo-Json -Compress)"
-                $allServerUrls = Invoke-RestMethod -Uri "$script:XoHost/rest/v0/servers" @script:XoRestParameters -Body $params
-                
-                if ($allServerUrls -and $allServerUrls.Count -gt 0) {
-                    Write-Verbose "Found $($allServerUrls.Count) servers"
-                    
-                    foreach ($serverUrl in $allServerUrls) {
-                        if ([string]::IsNullOrEmpty($serverUrl)) {
-                            Write-Verbose "Skipping empty URL"
-                            continue
-                        }
-
-                        try {
-                            $match = [regex]::Match($serverUrl, "\/rest\/v0\/servers\/([^\/]+)$")
-                            if ($match.Success) {
-                                $id = $match.Groups[1].Value
-                                if (![string]::IsNullOrEmpty($id)) {
-                                    $serverDetail = Invoke-RestMethod -Uri "$script:XoHost/rest/v0/servers/$id" @script:XoRestParameters
-                                    if ($serverDetail) {
-                                        ConvertTo-XoServerObject $serverDetail
-                                    }
-                                }
-                                else {
-                                    throw "Failed to extract valid ID from URL: $serverUrl"
-                                }
-                            }
-                            else {
-                                throw "URL doesn't match expected pattern: $serverUrl"
-                            }
-                        }
-                        catch {
-                            throw "Failed to process server from URL $serverUrl. Error: $_"
-                        }
-                    }
-                }
-                else {
-                    Write-Verbose "No servers found"
-                }
-            }
-            catch {
-                throw "Failed to retrieve servers: $_"
-            }
+    } catch {
+        $errorMessage = $_.Exception.Message
+        $errorMsg = "Failed to list servers. Error: $errorMessage"
+        if ($_.Exception.Response) {
+            $responseContent = $_.Exception.Response.Content | Out-String
+            $errorMsg += " Response: $responseContent"
         }
+        throw $errorMsg
     }
 }
