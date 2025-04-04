@@ -8,40 +8,54 @@
                 <TypeName>XoPowershell.VdiSnapshot</TypeName>
             </ViewSelectedBy>
             <TableControl>
-                <TableHeaders>
-                    <TableColumnHeader>
-                        <Width>30</Width>
-                    </TableColumnHeader>
-                    <TableColumnHeader>
-                        <Width>22</Width>
-                    </TableColumnHeader>
-                    <TableColumnHeader>
-                        <Width>12</Width>
-                        <Alignment>Right</Alignment>
-                    </TableColumnHeader>
-                    <TableColumnHeader>
-                        <Width>36</Width>
-                    </TableColumnHeader>
-                </TableHeaders>
                 <TableRowEntries>
                     <TableRowEntry>
                         <TableColumnItems>
                             <TableColumnItem>
+                                <PropertyName>VdiSnapshotUuid</PropertyName>
+                            </TableColumnItem>
+                            <TableColumnItem>
                                 <PropertyName>Name</PropertyName>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>Size</PropertyName>
+                                <Alignment>Right</Alignment>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>Usage</PropertyName>
+                                <Alignment>Right</Alignment>
                             </TableColumnItem>
                             <TableColumnItem>
                                 <PropertyName>SnapshotTime</PropertyName>
                             </TableColumnItem>
-                            <TableColumnItem>
-                                <PropertyName>VdiSnapshotSize</PropertyName>
-                            </TableColumnItem>
-                            <TableColumnItem>
-                                <PropertyName>VdiSnapshotUuid</PropertyName>
-                            </TableColumnItem>
                         </TableColumnItems>
                     </TableRowEntry>
                 </TableRowEntries>
+                <TableHeaders>
+                    <TableColumnHeader>
+                        <Label>ID</Label>
+                        <Width>36</Width>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Name</Label>
+                        <Width>20</Width>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Size</Label>
+                        <Width>15</Width>
+                        <Alignment>Right</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Usage</Label>
+                        <Width>15</Width>
+                        <Alignment>Right</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Snapshot Time</Label>
+                        <Width>20</Width>
+                    </TableColumnHeader>
+                </TableHeaders>
             </TableControl>
         </View>
     </ViewDefinitions>
-</Configuration> 
+</Configuration>

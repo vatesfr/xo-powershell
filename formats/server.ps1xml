@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Configuration>
+<Configuration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/PowerShell/PowerShell/master/src/Schemas/Format.xsd">
     <ViewDefinitions>
         <View>
             <Name>XoPowershell.Server</Name>
@@ -11,33 +12,55 @@
                     <TableRowEntry>
                         <TableColumnItems>
                             <TableColumnItem>
+                                <PropertyName>ServerUuid</PropertyName>
+                            </TableColumnItem>
+                            <TableColumnItem>
                                 <PropertyName>Name</PropertyName>
                             </TableColumnItem>
                             <TableColumnItem>
-                                <PropertyName>Address</PropertyName>
+                                <PropertyName>Status</PropertyName>
                             </TableColumnItem>
                             <TableColumnItem>
-                                <PropertyName>Status</PropertyName>
+                                <PropertyName>Address</PropertyName>
                             </TableColumnItem>
                             <TableColumnItem>
                                 <PropertyName>Username</PropertyName>
                             </TableColumnItem>
                             <TableColumnItem>
                                 <PropertyName>Enabled</PropertyName>
-                            </TableColumnItem>
-                            <TableColumnItem>
-                                <PropertyName>ReadOnly</PropertyName>
-                            </TableColumnItem>
-                            <TableColumnItem>
-                                <PropertyName>AllowUnauthorized</PropertyName>
-                            </TableColumnItem>
-                            <TableColumnItem>
-                                <PropertyName>ServerUuid</PropertyName>
+                                <Alignment>Center</Alignment>
                             </TableColumnItem>
                         </TableColumnItems>
                     </TableRowEntry>
                 </TableRowEntries>
+                <TableHeaders>
+                    <TableColumnHeader>
+                        <Label>ID</Label>
+                        <Width>36</Width>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Name</Label>
+                        <Width>20</Width>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Status</Label>
+                        <Width>12</Width>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Address</Label>
+                        <Width>16</Width>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Username</Label>
+                        <Width>10</Width>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Enabled</Label>
+                        <Width>8</Width>
+                        <Alignment>Center</Alignment>
+                    </TableColumnHeader>
+                </TableHeaders>
             </TableControl>
         </View>
     </ViewDefinitions>
-</Configuration> 
+</Configuration>

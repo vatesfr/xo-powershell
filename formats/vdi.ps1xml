@@ -12,18 +12,56 @@
                     <TableRowEntry>
                         <TableColumnItems>
                             <TableColumnItem>
+                                <PropertyName>VdiUuid</PropertyName>
+                            </TableColumnItem>
+                            <TableColumnItem>
                                 <PropertyName>Name</PropertyName>
                             </TableColumnItem>
                             <TableColumnItem>
-                                <PropertyName>VdiSize</PropertyName>
+                                <PropertyName>Type</PropertyName>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>Size</PropertyName>
                                 <Alignment>Right</Alignment>
                             </TableColumnItem>
                             <TableColumnItem>
-                                <PropertyName>VdiUuid</PropertyName>
+                                <PropertyName>Usage</PropertyName>
+                                <Alignment>Right</Alignment>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>Description</PropertyName>
                             </TableColumnItem>
                         </TableColumnItems>
                     </TableRowEntry>
                 </TableRowEntries>
+                <TableHeaders>
+                    <TableColumnHeader>
+                        <Label>ID</Label>
+                        <Width>36</Width>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Name</Label>
+                        <Width>20</Width>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Type</Label>
+                        <Width>12</Width>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Size</Label>
+                        <Width>15</Width>
+                        <Alignment>Right</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Usage</Label>
+                        <Width>15</Width>
+                        <Alignment>Right</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Name Description</Label>
+                        <Width>20</Width>
+                    </TableColumnHeader>
+                </TableHeaders>
             </TableControl>
         </View>
     </ViewDefinitions>

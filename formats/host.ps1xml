@@ -1,59 +1,70 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Configuration>
+<Configuration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/PowerShell/PowerShell/master/src/Schemas/Format.xsd">
     <ViewDefinitions>
         <View>
-            <Name>XoHost</Name>
+            <Name>XoPowershell.Host</Name>
             <ViewSelectedBy>
-                <TypeName>XoHost</TypeName>
+                <TypeName>XoPowershell.Host</TypeName>
             </ViewSelectedBy>
             <TableControl>
                 <TableRowEntries>
                     <TableRowEntry>
                         <TableColumnItems>
                             <TableColumnItem>
-                                <PropertyName>Name</PropertyName>
+                                <PropertyName>HostUuid</PropertyName>
                             </TableColumnItem>
                             <TableColumnItem>
-                                <PropertyName>Address</PropertyName>
+                                <PropertyName>Name</PropertyName>
                             </TableColumnItem>
                             <TableColumnItem>
                                 <PropertyName>PowerState</PropertyName>
                             </TableColumnItem>
                             <TableColumnItem>
-                                <PropertyName>MemoryFree</PropertyName>
-                                <FormatString>{0:N2} GB</FormatString>
+                                <PropertyName>VCpus</PropertyName>
                                 <Alignment>Right</Alignment>
                             </TableColumnItem>
                             <TableColumnItem>
-                                <PropertyName>HostUuid</PropertyName>
+                                <ScriptBlock>
+                                    if ($_.Memory.size) { $_.Memory.size } else { "N/A" }
+                                </ScriptBlock>
+                                <Alignment>Right</Alignment>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>Description</PropertyName>
                             </TableColumnItem>
                         </TableColumnItems>
                     </TableRowEntry>
                 </TableRowEntries>
                 <TableHeaders>
                     <TableColumnHeader>
+                        <Label>ID</Label>
+                        <Width>36</Width>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
                         <Label>Name</Label>
                         <Width>20</Width>
                     </TableColumnHeader>
                     <TableColumnHeader>
-                        <Label>Address</Label>
-                        <Width>15</Width>
-                    </TableColumnHeader>
-                    <TableColumnHeader>
-                        <Label>PowerState</Label>
+                        <Label>Power State</Label>
                         <Width>12</Width>
                     </TableColumnHeader>
                     <TableColumnHeader>
-                        <Label>Memory</Label>
-                        <Width>15</Width>
+                        <Label>CPUs</Label>
+                        <Width>5</Width>
                         <Alignment>Right</Alignment>
                     </TableColumnHeader>
                     <TableColumnHeader>
-                        <Label>HostUuid</Label>
-                        <Width>36</Width>
+                        <Label>Memory</Label>
+                        <Width>12</Width>
+                        <Alignment>Right</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Description</Label>
+                        <Width>30</Width>
                     </TableColumnHeader>
                 </TableHeaders>
             </TableControl>
         </View>
     </ViewDefinitions>
-</Configuration> 
+</Configuration>
