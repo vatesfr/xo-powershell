@@ -37,7 +37,7 @@ function ConvertTo-XoVmObject {
             Memory         = $InputObject.memory
         }
 
-        if ($InputObject.CPUs -ne $null) {
+        if ($null -ne $InputObject.CPUs) {
             if ($InputObject.CPUs.PSObject.Properties.Name -contains 'number') {
                 $vmObj | Add-Member -MemberType NoteProperty -Name CPUs -Value $InputObject.CPUs.number
             }
@@ -65,11 +65,10 @@ function Get-XoVmDetailFromPath {
         $detailParams = @{ fields = $script:XO_VM_FIELDS }
         
         try {
-            $vmDetails = Invoke-RestMethod -Uri $vmDetailUri @script:XoRestParameters
+            $vmDetails = Invoke-RestMethod -Uri $vmDetailUri @script:XoRestParameters -Body $detailParams
             return $vmDetails
         } catch {
-            Write-Warning "Error fetching VM detail for ID $vmId. Error: $_"
-            return $null
+            throw ("Error fetching VM detail for ID {0}: {1}" -f $vmId, $_)
         }
     }
     return $null
@@ -77,18 +76,19 @@ function Get-XoVmDetailFromPath {
 
 function Get-XoSingleVmById {
     param (
-        [string]$VmId
+        [string]$VmUuid
     )
     
     try {
-        $uri = "$script:XoHost/rest/v0/vms/$VmId"
-        $vmData = Invoke-RestMethod -Uri $uri @script:XoRestParameters
+        $uri = "$script:XoHost/rest/v0/vms/$VmUuid"
+        $params = @{ fields = $script:XO_VM_FIELDS }
+        $vmData = Invoke-RestMethod -Uri $uri @script:XoRestParameters -Body $params
         
         if ($vmData) {
             return ConvertTo-XoVmObject -InputObject $vmData
         }
     } catch {
-        throw "Failed to retrieve VM with ID $VmId. Error: $_"
+        throw ("Failed to retrieve VM with UUID {0}: {1}" -f $VmUuid, $_)
     }
     return $null
 }
@@ -146,71 +146,78 @@ function Get-XoVm {
         [string]$Filter,
         
         [Parameter(ParameterSetName = "Filter")]
-        [int]$Limit = $(if ($null -ne $script:XO_DEFAULT_LIMIT) { $script:XO_DEFAULT_LIMIT } else { 25 })
+        [int]$Limit = $script:XoSessionLimit
     )
 
-    if (-not $script:XoHost -or -not $script:XoRestParameters) {
-        throw "Not connected to Xen Orchestra. Call Connect-XoSession first."
-    }
-    
-    if ($PSCmdlet.ParameterSetName -eq "VmUuid") {
-        foreach ($id in $VmUuid) {
-            Get-XoSingleVmById -VmId $id
+    begin {
+        if (-not $script:XoHost -or -not $script:XoRestParameters) {
+            throw ("Not connected to Xen Orchestra. Call Connect-XoSession first.")
         }
-        return
-    }
-    
-    $params = @{ fields = $script:XO_VM_FIELDS }
-    
-    $filterParts = @()
-    
-    if ($PowerState) {
-        $filterParts += "power_state:($($PowerState -join '|'))"
-    }
-
-    if ($Tag) {
-        $filterParts += "tags:($($Tag -join '&'))"
-    }
-
-    if ($Filter) {
-        $filterParts += $Filter
-    }
-    
-    if ($filterParts.Count -gt 0) {
-        $params['filter'] = $filterParts -join " "
-    }
-
-    if ($Limit -ne 0) {
-        $params['limit'] = $Limit
-        if (!$PSBoundParameters.ContainsKey('Limit')) {
-            Write-Warning "No limit specified. Using default limit of $Limit. Use -Limit 0 for unlimited results."
-        }
-    }
-
-    try {
-        $uri = "$script:XoHost/rest/v0/vms"
-        Write-Verbose "Getting VMs from $uri with parameters: $($params | ConvertTo-Json -Compress)"
         
-        $response = Invoke-RestMethod -Uri $uri @script:XoRestParameters -Body $params
+        $params = @{ fields = $script:XO_VM_FIELDS }
         
-        if (!$response -or $response.Count -eq 0) {
-            Write-Verbose "No VMs found matching criteria"
-            return
+        $filterParts = @()
+        
+        if ($PowerState) {
+            $filterParts += "power_state:($($PowerState -join '|'))"
         }
 
-        foreach ($vmPath in $response) {
-            if ($vmPath -is [string]) {
-                $vmDetail = Get-XoVmDetailFromPath -VmPath $vmPath
-                if ($vmDetail) {
-                    ConvertTo-XoVmObject -InputObject $vmDetail
-                }
-            } else {
-                ConvertTo-XoVmObject -InputObject $vmPath
+        if ($Tag) {
+            $filterParts += "tags:($($Tag -join '&'))"
+        }
+
+        if ($Filter) {
+            $filterParts += $Filter
+        }
+        
+        if ($filterParts.Count -gt 0) {
+            $params['filter'] = $filterParts -join " "
+        }
+
+        if ($Limit -ne 0) {
+            $params['limit'] = $Limit
+            if (!$PSBoundParameters.ContainsKey('Limit')) {
+                Write-Warning "No limit specified. Using default limit of $Limit. Use -Limit 0 for unlimited results."
             }
         }
     }
-    catch {
-        throw "Failed to list VMs. Error: $_"
+    
+    process {
+        if ($PSCmdlet.ParameterSetName -eq "VmUuid") {
+            foreach ($id in $VmUuid) {
+                Get-XoSingleVmById -VmUuid $id
+            }
+        }
+    }
+    
+    end {
+        if ($PSCmdlet.ParameterSetName -eq "Filter") {
+            try {
+                $uri = "$script:XoHost/rest/v0/vms"
+                Write-Verbose "Getting VMs from $uri with parameters: $($params | ConvertTo-Json -Compress)"
+                
+                $response = Invoke-RestMethod -Uri $uri @script:XoRestParameters -Body $params
+                
+                if (!$response -or $response.Count -eq 0) {
+                    Write-Verbose "No VMs found matching criteria"
+                    return
+                }
+                
+                Write-Verbose "Found $($response.Count) VMs"
+
+                $vmsToProcess = $response
+                if ($Limit -gt 0 -and $response.Count -gt $Limit) {
+                    $vmsToProcess = $response[0..($Limit-1)]
+                }
+
+                foreach ($vmItem in $vmsToProcess) {
+                    ConvertTo-XoVmObject -InputObject $vmItem
+                }
+            }
+            catch {
+                throw ("Failed to list VMs. Error: {0}" -f $_)
+            }
+        }
     }
 }
 
@@ -462,7 +469,7 @@ function ConvertTo-XoVmSnapshotObject {
         The VM snapshot object from the API.
     #>
     [CmdletBinding()]
-    Param (
+    param (
         [parameter(Mandatory = $true)]
         [PSObject] $InputObject
     )
@@ -479,7 +486,7 @@ function ConvertTo-XoVmSnapshotObject {
         Memory         = $InputObject.memory
     }
 
-    if ($InputObject.CPUs -ne $null) {
+    if ($null -ne $InputObject.CPUs) {
         if ($InputObject.CPUs.PSObject.Properties.Name -contains 'number') {
             $snapshotObj | Add-Member -MemberType NoteProperty -Name CPUs -Value $InputObject.CPUs.number
         }
@@ -496,10 +503,10 @@ function Get-XoVmSnapshot {
     .SYNOPSIS
         Get VM snapshots.
     .DESCRIPTION
-        Retrieves VM snapshots from Xen Orchestra. Can retrieve specific snapshots by their ID
+        Retrieves VM snapshots from Xen Orchestra. Can retrieve specific snapshots by their UUID
         or filter snapshots by various criteria.
-    .PARAMETER SnapshotId
-        The ID(s) of the snapshot(s) to retrieve.
+    .PARAMETER VmSnapshotUuid
+        The UUID(s) of the VM snapshot(s) to retrieve.
     .PARAMETER Filter
         Filter to apply to the snapshot query.
     .PARAMETER Limit
@@ -511,87 +518,89 @@ function Get-XoVmSnapshot {
         Get-XoVmSnapshot -Limit 0
         Returns all VM snapshots without limit.
     .EXAMPLE
-        Get-XoVmSnapshot -SnapshotId "a1b2c3d4"
-        Returns the VM snapshot with the specified ID.
+        Get-XoVmSnapshot -VmSnapshotUuid "12345678-abcd-1234-abcd-1234567890ab"
+        Returns the VM snapshot with the specified UUID.
     .EXAMPLE
         Get-XoVmSnapshot -Filter "name_label:backup"
         Returns VM snapshots with "backup" in their name (up to default limit).
     #>
     [CmdletBinding(DefaultParameterSetName = "All")]
     param(
-        [Parameter(Mandatory, ValueFromPipelineByPropertyName, Position = 0, ParameterSetName = "SnapshotId")]
-        [ValidatePattern("[0-9a-z]+")]
-        [Alias("VmSnapshotUuid")]
-        [string[]]$SnapshotId,
-
+        [Parameter(Mandatory, ValueFromPipelineByPropertyName, Position = 0, ParameterSetName = "VmSnapshotUuid")]
+        [ValidateNotNullOrEmpty()]
+        [Alias("SnapshotId", "SnapshotUuid")]
+        [string[]]$VmSnapshotUuid,
+        
         [Parameter(ParameterSetName = "Filter")]
         [string]$Filter,
 
         [Parameter(ParameterSetName = "Filter")]
         [Parameter(ParameterSetName = "All")]
-        [int]$Limit = $(if ($null -ne $script:XO_DEFAULT_LIMIT) { $script:XO_DEFAULT_LIMIT } else { 25 })
+        [int]$Limit = $script:XoSessionLimit
     )
 
-    if (-not $script:XoHost -or -not $script:XoRestParameters) {
-        throw "Not connected to Xen Orchestra. Call Connect-XoSession first."
+    begin {
+        if (-not $script:XoHost -or -not $script:XoRestParameters) {
+            throw ("Not connected to Xen Orchestra. Call Connect-XoSession first.")
+        }
+        
+        $fields = "uuid,name_label,name_description,snapshot_time,snapshot_of,power_state,tags,CPUs,memory"
+        $params = @{ fields = $fields }
+
+        if ($PSBoundParameters.ContainsKey('Filter')) {
+            $params.filter = $Filter
+        }
+
+        if ($Limit -ne 0) {
+            $params.limit = $Limit
+            if (!$PSBoundParameters.ContainsKey('Limit')) {
+                Write-Warning "No limit specified. Using default limit of $Limit. Use -Limit 0 for unlimited results."
+            }
+        }
     }
     
-    if ($PSCmdlet.ParameterSetName -eq "SnapshotId") {
-        foreach ($id in $SnapshotId) {
-            try {
-                Write-Verbose "Getting VM snapshot with ID $id"
-                $snapshotData = Invoke-RestMethod -Uri "$script:XoHost/rest/v0/vm-snapshots/$id" @script:XoRestParameters
-                ConvertTo-XoVmSnapshotObject $snapshotData
-            }
-            catch {
-                throw "Failed to retrieve VM snapshot with ID $id. $_"
-            }
-        }
-        return
-    }
-    
-    $fields = "uuid,name_label,name_description,snapshot_time,snapshot_of,power_state,tags,CPUs,memory"
-    $params = @{ fields = $fields }
-
-    if ($PSBoundParameters.ContainsKey('Filter')) {
-        $params.filter = $Filter
-    }
-
-    if ($Limit -ne 0) {
-        $params.limit = $Limit
-        if (!$PSBoundParameters.ContainsKey('Limit')) {
-            Write-Warning "No limit specified. Using default limit of $Limit. Use -Limit 0 for unlimited results."
-        }
-    }
-
-    try {
-        $uri = "$script:XoHost/rest/v0/vm-snapshots"
-        Write-Verbose "Getting VM snapshots from $uri with parameters: $($params | ConvertTo-Json -Compress)"
-        
-        $response = Invoke-RestMethod -Uri $uri @script:XoRestParameters -Body $params
-        
-        if (!$response -or $response.Count -eq 0) {
-            Write-Verbose "No VM snapshots found matching criteria"
-            return
-        }
-        
-        foreach ($snapshotPath in $response) {
-            if ($snapshotPath -is [string] -and $snapshotPath -match '/vm-snapshots/([^/]+)') {
-                $id = $matches[1]
+    process {
+        if ($PSCmdlet.ParameterSetName -eq "VmSnapshotUuid") {
+            foreach ($id in $VmSnapshotUuid) {
                 try {
-                    $snapshot = Invoke-RestMethod -Uri "$script:XoHost/rest/v0/vm-snapshots/$id" @script:XoRestParameters
-                    ConvertTo-XoVmSnapshotObject $snapshot
+                    Write-Verbose "Getting VM snapshot with UUID $id"
+                    $snapshotData = Invoke-RestMethod -Uri "$script:XoHost/rest/v0/vm-snapshots/$id" @script:XoRestParameters
+                    ConvertTo-XoVmSnapshotObject $snapshotData
                 }
                 catch {
-                    Write-Warning "Failed to get details for snapshot $id : $_"
+                    throw ("Failed to retrieve VM snapshot with UUID {0}: {1}" -f $id, $_)
                 }
-            }
-            else {
-                ConvertTo-XoVmSnapshotObject $snapshotPath
             }
         }
     }
-    catch {
-        throw "Failed to list VM snapshots. Error: $_"
+    
+    end {
+        if ($PSCmdlet.ParameterSetName -eq "All" -or $PSCmdlet.ParameterSetName -eq "Filter") {
+            try {
+                $uri = "$script:XoHost/rest/v0/vm-snapshots"
+                Write-Verbose "Getting VM snapshots from $uri with parameters: $($params | ConvertTo-Json -Compress)"
+                
+                $snapshotsResponse = Invoke-RestMethod -Uri $uri @script:XoRestParameters -Body $params
+                
+                if (!$snapshotsResponse -or $snapshotsResponse.Count -eq 0) {
+                    Write-Verbose "No VM snapshots found matching criteria"
+                    return
+                }
+                
+                Write-Verbose "Found $($snapshotsResponse.Count) VM snapshots"
+                
+                $snapshotsToProcess = $snapshotsResponse
+                if ($Limit -gt 0 -and $snapshotsResponse.Count -gt $Limit) {
+                    $snapshotsToProcess = $snapshotsResponse[0..($Limit-1)]
+                }
+                
+                foreach ($snapshotItem in $snapshotsToProcess) {
+                    ConvertTo-XoVmSnapshotObject $snapshotItem
+                }
+            }
+            catch {
+                throw ("Failed to list VM snapshots. Error: {0}" -f $_)
+            }
+        }
     }
 }
