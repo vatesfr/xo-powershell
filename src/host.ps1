@@ -56,44 +56,47 @@ function ConvertTo-XoHostObject {
 
 function Get-XoSingleHostById {
     param (
-        [string]$HostId,
+        [string]$HostUuid,
         [hashtable]$Params
     )
     
     try {
-        $uri = "$script:XoHost/rest/v0/hosts/$HostId"
-        $hostData = Invoke-RestMethod -Uri $uri @script:XoRestParameters -Body ($Params | ConvertTo-Json -Compress) -Method Get
-        
-        $hostData = $hostData | ConvertFrom-Json -AsHashTable
+        $uri = "$script:XoHost/rest/v0/hosts/$HostUuid"
+        $params = @{ fields = $script:XO_HOST_FIELDS }
+        $hostData = Invoke-RestMethod -Uri $uri @script:XoRestParameters -Body $params
         
         if ($hostData) {
             return ConvertTo-XoHostObject -InputObject $hostData
         }
     } catch {
-        throw "Failed to retrieve host with ID $HostId. Error: $_"
+        throw ("Failed to retrieve host with UUID {0}: {1}" -f $HostUuid, $_)
     }
     return $null
 }
 
 function Get-XoHostDetailFromPath {
     param(
-        [string]$HostDetail
+        [string]$HostPath
     )
     
-    if ($HostDetail -match "/hosts/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})") {
-        $hostId = $matches[1]
-        $hostDetailUri = "$script:XoHost/rest/v0/hosts/$hostId"
+    if ([string]::IsNullOrEmpty($HostPath)) {
+        return $null
+    }
+    
+    if ($HostPath -match "/hosts/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})") {
+        $hostUuid = $matches[1]
+        $hostDetailUri = "$script:XoHost/rest/v0/hosts/$hostUuid"
         $detailParams = @{ fields = $script:XO_HOST_FIELDS }
         
         try {
-            $response = Invoke-RestMethod -Uri $hostDetailUri @script:XoRestParameters -Body ($detailParams | ConvertTo-Json -Compress) -Method Get
-            return $response | ConvertFrom-Json -AsHashTable
+            $response = Invoke-RestMethod -Uri $hostDetailUri @script:XoRestParameters -Body $detailParams
+            return ConvertTo-XoHostObject -InputObject $response
         } catch {
-            Write-Warning "Error fetching host detail for ID $hostId. Error: $_"
+            Write-Warning "Error fetching host detail for UUID $hostUuid. Error: $_"
             return $null
         }
     }
-    return $HostDetail
+    return $HostPath
 }
 
 function Get-XoHost {
@@ -103,7 +106,7 @@ function Get-XoHost {
     .DESCRIPTION
         Retrieves physical XCP-ng/XenServer hosts from Xen Orchestra. 
         Can retrieve specific hosts by their UUID or filter hosts by various criteria.
-    .PARAMETER HostId
+    .PARAMETER HostUuid
         The UUID(s) of the host(s) to retrieve.
     .PARAMETER Filter
         Filter to apply to the host query.
@@ -116,7 +119,7 @@ function Get-XoHost {
         Get-XoHost -Limit 0
         Returns all hosts without limit.
     .EXAMPLE
-        Get-XoHost -HostId "12345678-abcd-1234-abcd-1234567890ab"
+        Get-XoHost -HostUuid "12345678-abcd-1234-abcd-1234567890ab"
         Returns the host with the specified UUID.
     .EXAMPLE
         Get-XoHost -Filter "power_state:running"
@@ -124,69 +127,68 @@ function Get-XoHost {
     #>
     [CmdletBinding(DefaultParameterSetName = "All")]
     param(
-        [Parameter(Mandatory, ValueFromPipelineByPropertyName, Position = 0, ParameterSetName = "HostId")]
+        [Parameter(Mandatory, ValueFromPipelineByPropertyName, Position = 0, ParameterSetName = "HostUuid")]
         [ValidatePattern("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")]
-        [Alias("HostUuid")]
-        [string[]]$HostId,
+        [Alias("HostId")]
+        [string[]]$HostUuid,
         
         [Parameter(ParameterSetName = "Filter")]
         [string]$Filter,
         
         [Parameter(ParameterSetName = "Filter")]
         [Parameter(ParameterSetName = "All")]
-        [int]$Limit = $(if ($null -ne $script:XO_DEFAULT_LIMIT) { $script:XO_DEFAULT_LIMIT } else { 25 })
+        [int]$Limit = $script:XoSessionLimit
     )
 
-    if (-not $script:XoHost -or -not $script:XoRestParameters) {
-        throw "Not connected to Xen Orchestra. Call Connect-XoSession first."
-    }
-
-    $params = @{ fields = $script:XO_HOST_FIELDS }
-
-    if ($PSCmdlet.ParameterSetName -eq "Filter" -and $Filter) {
-        $params['filter'] = $Filter
-    }
-
-    if ($Limit -ne 0 -and ($PSCmdlet.ParameterSetName -eq "Filter" -or $PSCmdlet.ParameterSetName -eq "All")) {
-        $params['limit'] = $Limit
-        if (!$PSBoundParameters.ContainsKey('Limit')) {
-            Write-Warning "No limit specified. Using default limit of $Limit. Use -Limit 0 for unlimited results."
+    begin {
+        if (-not $script:XoHost -or -not $script:XoRestParameters) {
+            throw ("Not connected to Xen Orchestra. Call Connect-XoSession first.")
         }
-    }
-
-    if ($PSCmdlet.ParameterSetName -eq "HostId") {
-        foreach ($id in $HostId) {
-            Get-XoSingleHostById -HostId $id -Params $params
-        }
-        return
-    }
-
-    try {
-        $uri = "$script:XoHost/rest/v0/hosts"
-        $hostsResponse = Invoke-RestMethod -Uri $uri @script:XoRestParameters -Body ($params | ConvertTo-Json -Compress) -Method Get
         
-        if (!$hostsResponse -or $hostsResponse.Count -eq 0) {
-            Write-Verbose "No hosts found"
-            return
+        $params = @{ fields = $script:XO_HOST_FIELDS }
+        
+        if ($PSCmdlet.ParameterSetName -eq "Filter" -and $Filter) {
+            $params['filter'] = $Filter
         }
-
-        $hostsToProcess = $hostsResponse
-        if ($Limit -gt 0 -and $hostsResponse.Count -gt $Limit) {
-            $hostsToProcess = $hostsResponse[0..($Limit-1)]
-        }
-
-        foreach ($hostDetail in $hostsToProcess) {
-            $fullHostDetail = Get-XoHostDetailFromPath -HostDetail $hostDetail
-            if ($fullHostDetail) {
-                $hostObj = ConvertTo-XoHostObject -InputObject $fullHostDetail
-                Write-Output $hostObj
+        
+        if ($Limit -ne 0 -and ($PSCmdlet.ParameterSetName -eq "Filter" -or $PSCmdlet.ParameterSetName -eq "All")) {
+            $params['limit'] = $Limit
+            if (!$PSBoundParameters.ContainsKey('Limit')) {
+                Write-Warning "No limit specified. Using default limit of $Limit. Use -Limit 0 for unlimited results."
             }
         }
-    } catch {
-        $errorMsg = "Failed to list hosts. Error: $($_.Exception.Message)"
-        if ($_.Exception.Response) {
-            $errorMsg += " Response: $($_.Exception.Response.Content | Out-String)"
+    }
+    
+    process {
+        if ($PSCmdlet.ParameterSetName -eq "HostUuid") {
+            foreach ($id in $HostUuid) {
+                Get-XoSingleHostById -HostUuid $id -Params $params
+            }
         }
-        throw $errorMsg
+    }
+    
+    end {
+        if ($PSCmdlet.ParameterSetName -eq "All" -or $PSCmdlet.ParameterSetName -eq "Filter") {
+            try {
+                $uri = "$script:XoHost/rest/v0/hosts"
+                $hostsResponse = Invoke-RestMethod -Uri $uri @script:XoRestParameters -Body $params
+                
+                if (!$hostsResponse -or $hostsResponse.Count -eq 0) {
+                    Write-Verbose "No hosts found"
+                    return
+                }
+
+                $hostsToProcess = $hostsResponse
+                if ($Limit -gt 0 -and $hostsResponse.Count -gt $Limit) {
+                    $hostsToProcess = $hostsResponse[0..($Limit-1)]
+                }
+
+                foreach ($hostItem in $hostsToProcess) {
+                    ConvertTo-XoHostObject -InputObject $hostItem
+                }
+            } catch {
+                throw ("Failed to list hosts. Error: {0}" -f $_)
+            }
+        }
     }
 }

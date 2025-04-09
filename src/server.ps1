@@ -1,13 +1,13 @@
 # SPDX-License-Identifier: Apache-2.0
 
-$script:XO_SERVER_FIELDS = "id,label,host,status,enabled,username,allowUnauthorized,readOnly,poolId,poolNameLabel,version"
+$script:XO_SERVER_FIELDS = "id,host,label,address,version,status,enabled,error,username,readOnly,allowUnauthorized"
 
 function ConvertTo-XoServerObject {
     <#
     .SYNOPSIS
         Convert a server object from the API to a PowerShell object.
     .DESCRIPTION
-        Convert a server object from the API to a PowerShell object with proper properties and types.
+        Convert a server object from the API to a PowerShell object with proper properties.
     .PARAMETER InputObject
         The server object from the API.
     #>
@@ -20,81 +20,73 @@ function ConvertTo-XoServerObject {
 
     process {
         $props = @{
-            PSTypeName = "XoPowershell.Server"
             ServerUuid = $InputObject.id
-            Name = $InputObject.label
-            Address = $InputObject.host
-            Status = $InputObject.status
-            Enabled = $InputObject.enabled
-            Username = $InputObject.username
+            Name       = $InputObject.label
+            NameHost   = $InputObject.host
+            Address    = $InputObject.address
+            Status     = $InputObject.status
+            Version    = $InputObject.version
+            Enabled    = $InputObject.enabled
+            ReadOnly   = $InputObject.readOnly
+            Username   = $InputObject.username
+            Error      = $InputObject.error
             AllowUnauthorized = $InputObject.allowUnauthorized
-            ReadOnly = $InputObject.readOnly
-            PoolId = $InputObject.poolId
-            PoolName = $InputObject.poolNameLabel
-            Version = $InputObject.version
         }
         
-        [PSCustomObject]$props
+        Set-XoObject $InputObject -TypeName XoPowershell.Server -Properties $props
     }
 }
 
 function Get-XoSingleServerById {
     param (
-        [string]$ServerId,
+        [string]$ServerUuid,
         [hashtable]$Params
     )
     
     try {
-        $uri = "$script:XoHost/rest/v0/servers/$ServerId"
-        Write-Verbose "Getting server with ID $ServerId from $uri"
-        
-        $serverData = Invoke-RestMethod -Uri $uri @script:XoRestParameters
-        if ($serverData -is [string]) {
-            $serverData = $serverData | ConvertFrom-Json -AsHashTable
+        Write-Verbose "Getting server with ID $ServerUuid"
+        $uri = "$script:XoHost/rest/v0/servers/$ServerUuid"
+
+        if ($null -eq $Params) {
+            $Params = @{}
         }
+        if (-not $Params.ContainsKey('fields')) {
+            $Params['fields'] = $script:XO_SERVER_FIELDS
+        }
+        
+        $serverData = Invoke-RestMethod -Uri $uri @script:XoRestParameters -Body $Params
         
         if ($serverData) {
             return ConvertTo-XoServerObject -InputObject $serverData
         }
     } catch {
-        $errorMessage = $_
-        throw "Failed to retrieve server with ID $ServerId. Error: $errorMessage"
+        throw ("Failed to retrieve server with ID {0}: {1}" -f $ServerUuid, $_)
     }
     return $null
 }
 
 function Get-XoServerDetailFromUrl {
     param(
-        [string]$ServerUrl
+        [string]$ServerPath
     )
     
-    if ([string]::IsNullOrEmpty($ServerUrl)) {
+    if ([string]::IsNullOrEmpty($ServerPath)) {
         return $null
     }
     
-    $match = [regex]::Match($ServerUrl, "\/rest\/v0\/servers\/([^\/]+)$")
-    if (!$match.Success) {
-        Write-Warning "URL doesn't match expected pattern: $ServerUrl"
-        return $null
-    }
-    
-    $id = $match.Groups[1].Value
-    if ([string]::IsNullOrEmpty($id)) {
-        Write-Warning "Failed to extract valid ID from URL: $ServerUrl"
-        return $null
-    }
-    
-    try {
-        $serverDetail = Invoke-RestMethod -Uri "$script:XoHost/rest/v0/servers/$id" @script:XoRestParameters
-        if ($serverDetail -is [string]) {
-            $serverDetail = $serverDetail | ConvertFrom-Json -AsHashTable
+    if ($ServerPath -match "/servers/([^/]+)") {
+        $serverId = $matches[1]
+        $serverDetailUri = "$script:XoHost/rest/v0/servers/$serverId"
+        
+        try {
+            Write-Verbose "Fetching server details for ID $serverId from URL"
+            $serverDetail = Invoke-RestMethod -Uri $serverDetailUri @script:XoRestParameters
+            return ConvertTo-XoServerObject -InputObject $serverDetail
+        } catch {
+            throw ("Error fetching server detail for ID {0}: {1}" -f $serverId, $_)
         }
-        return $serverDetail
-    } catch {
-        $errorMessage = $_
-        Write-Warning "Error fetching server detail for ID $id`: $errorMessage"
-        return $null
     }
+    return $ServerPath
 }
 
 function Get-XoServer {
@@ -102,10 +94,10 @@ function Get-XoServer {
     .SYNOPSIS
         Get servers from Xen Orchestra.
     .DESCRIPTION
-        Retrieves servers from Xen Orchestra. Can retrieve specific servers by their UUID
+        Retrieves servers from Xen Orchestra. Can retrieve specific servers by their ID
         or filter servers by various criteria.
     .PARAMETER ServerUuid
-        The UUID(s) of the server(s) to retrieve.
+        The ID(s) of the server(s) to retrieve.
     .PARAMETER Filter
         Filter to apply to the server query.
     .PARAMETER Limit
@@ -118,7 +110,7 @@ function Get-XoServer {
         Returns all servers without limit.
     .EXAMPLE
         Get-XoServer -ServerUuid "12345678-abcd-1234-abcd-1234567890ab"
-        Returns the server with the specified UUID.
+        Returns the server with the specified ID.
     .EXAMPLE
         Get-XoServer -Filter "status:connected"
         Returns connected servers (up to default limit).
@@ -126,6 +118,7 @@ function Get-XoServer {
     [CmdletBinding(DefaultParameterSetName = "All")]
     param(
         [Parameter(Mandatory, ValueFromPipelineByPropertyName, Position = 0, ParameterSetName = "ServerUuid")]
+        [Alias("ServerId")]
         [string[]]$ServerUuid,
 
         [Parameter(ParameterSetName = "Filter")]
@@ -133,62 +126,61 @@ function Get-XoServer {
 
         [Parameter(ParameterSetName = "Filter")]
         [Parameter(ParameterSetName = "All")]
-        [int]$Limit = $(if ($null -ne $script:XO_DEFAULT_LIMIT) { $script:XO_DEFAULT_LIMIT } else { 25 })
+        [int]$Limit = $script:XoSessionLimit
     )
 
-    if (-not $script:XoHost -or -not $script:XoRestParameters) {
-        throw "Not connected to Xen Orchestra. Call Connect-XoSession first."
-    }
-    
-    $params = @{}
-    if ($PSBoundParameters.ContainsKey('Filter')) {
-        $params['filter'] = $Filter
-    }
-    
-    if ($Limit -ne 0 -and ($PSCmdlet.ParameterSetName -eq "Filter" -or $PSCmdlet.ParameterSetName -eq "All")) {
-        $params['limit'] = $Limit
-        if (!$PSBoundParameters.ContainsKey('Limit')) {
-            Write-Warning "No limit specified. Using default limit of $Limit. Use -Limit 0 for unlimited results."
-        }
-    }
-    
-    if ($PSCmdlet.ParameterSetName -eq "ServerUuid") {
-        foreach ($id in $ServerUuid) {
-            Get-XoSingleServerById -ServerId $id -Params $params
-        }
-        return
-    }
-    
-    try {
-        $uri = "$script:XoHost/rest/v0/servers"
-        Write-Verbose "Getting servers from $uri with parameters: $($params | ConvertTo-Json -Compress)"
-        
-        $serversResponse = Invoke-RestMethod -Uri $uri @script:XoRestParameters -Body ($params | ConvertTo-Json -Compress) -Method Get
-        
-        if (!$serversResponse -or $serversResponse.Count -eq 0) {
-            Write-Verbose "No servers found"
-            return
+    begin {
+        if (-not $script:XoHost -or -not $script:XoRestParameters) {
+            throw ("Not connected to Xen Orchestra. Call Connect-XoSession first.")
         }
         
-        $serversToProcess = $serversResponse
-        if ($Limit -gt 0 -and $serversResponse.Count -gt $Limit) {
-            $serversToProcess = $serversResponse[0..($Limit-1)]
+        $params = @{ fields = $script:XO_SERVER_FIELDS }
+        
+        if ($PSCmdlet.ParameterSetName -eq "Filter" -and $Filter) {
+            $params['filter'] = $Filter
         }
         
-        foreach ($serverUrl in $serversToProcess) {
-            $serverDetail = Get-XoServerDetailFromUrl -ServerUrl $serverUrl
-            if ($serverDetail) {
-                $serverObj = ConvertTo-XoServerObject -InputObject $serverDetail
-                Write-Output $serverObj
+        if ($Limit -ne 0 -and ($PSCmdlet.ParameterSetName -eq "Filter" -or $PSCmdlet.ParameterSetName -eq "All")) {
+            $params['limit'] = $Limit
+            if (!$PSBoundParameters.ContainsKey('Limit')) {
+                Write-Warning "No limit specified. Using default limit of $Limit. Use -Limit 0 for unlimited results."
             }
         }
-    } catch {
-        $errorMessage = $_.Exception.Message
-        $errorMsg = "Failed to list servers. Error: $errorMessage"
-        if ($_.Exception.Response) {
-            $responseContent = $_.Exception.Response.Content | Out-String
-            $errorMsg += " Response: $responseContent"
+    }
+    
+    process {
+        if ($PSCmdlet.ParameterSetName -eq "ServerUuid") {
+            foreach ($id in $ServerUuid) {
+                Get-XoSingleServerById -ServerUuid $id -Params $params
+            }
         }
-        throw $errorMsg
+    }
+    
+    end {
+        if ($PSCmdlet.ParameterSetName -eq "All" -or $PSCmdlet.ParameterSetName -eq "Filter") {
+            try {
+                Write-Verbose "Getting servers with parameters: $($params | ConvertTo-Json -Compress)"
+                $uri = "$script:XoHost/rest/v0/servers"
+                $response = Invoke-RestMethod -Uri $uri @script:XoRestParameters -Body $params
+                
+                if (!$response -or $response.Count -eq 0) {
+                    Write-Verbose "No servers found matching criteria"
+                    return
+                }
+                
+                Write-Verbose "Found $($response.Count) servers"
+                
+                $serversToProcess = $response
+                if ($Limit -gt 0 -and $response.Count -gt $Limit) {
+                    $serversToProcess = $response[0..($Limit-1)]
+                }
+                
+                foreach ($serverItem in $serversToProcess) {
+                    ConvertTo-XoServerObject -InputObject $serverItem
+                }
+            } catch {
+                throw ("Failed to list servers. Error: {0}" -f $_)
+            }
+        }
     }
 }
