@@ -19,7 +19,6 @@ function ConvertTo-XoTaskObject {
     )
 
     process {
-        # Extract and format the name from either properties.name or properties.method
         $name = if ($InputObject.properties.name) { 
             $InputObject.properties.name 
         } elseif ($InputObject.properties.method) { 
@@ -28,10 +27,8 @@ function ConvertTo-XoTaskObject {
             "Unknown" 
         }
 
-        # Extract task type if available
         $type = if ($InputObject.properties.type) { $InputObject.properties.type } else { "" }
 
-        # Convert timestamps to DateTime if they exist
         $startTime = if ($InputObject.start -and $InputObject.start -gt 0) { 
             [System.DateTimeOffset]::FromUnixTimeMilliseconds($InputObject.start).ToLocalTime() 
         } else { 
@@ -44,7 +41,6 @@ function ConvertTo-XoTaskObject {
             $null 
         }
         
-        # Build the message from result if available
         $message = if ($InputObject.result.message) { 
             $InputObject.result.message 
         } elseif ($InputObject.result.code) {
@@ -53,7 +49,6 @@ function ConvertTo-XoTaskObject {
             "" 
         }
 
-        # Create and return the task object
         $props = @{
             PSTypeName = "XoPowershell.Task"
             TaskId     = $InputObject.id
@@ -87,7 +82,7 @@ function ConvertFrom-XoTaskHref {
 
     process {
         if ($Uri -notmatch "\/rest\/v0\/tasks\/([0-9a-z]+)") {
-            throw "Bad task href format: $Uri"
+            throw ("Bad task href format: {0}" -f $Uri)
         }
         
         $taskId = $matches[1]
@@ -141,7 +136,7 @@ function Get-XoTask {
         Maximum number of results to return. Default is 25 if not specified.
     .EXAMPLE
         Get-XoTask
-        Returns up to 25 pending tasks.
+        Returns up to 25 tasks of any status.
     .EXAMPLE
         Get-XoTask -Status failure
         Returns failed tasks.
@@ -150,81 +145,81 @@ function Get-XoTask {
         Returns the task with the specified ID.
     .EXAMPLE
         Get-XoTask -Limit 5
-        Returns the first 5 pending tasks.
+        Returns the first 5 tasks.
     #>
-    [CmdletBinding(DefaultParameterSetName = "Status")]
+    [CmdletBinding(DefaultParameterSetName = "Filter")]
     param(
         [Parameter(Mandatory, ValueFromPipelineByPropertyName, Position = 0, ParameterSetName = "TaskId")]
         [ValidateNotNullOrEmpty()]
         [string[]]$TaskId,
 
-        [Parameter(ParameterSetName = "Status")]
+        [Parameter(ParameterSetName = "Filter")]
         [ValidateSet("pending", "success", "failure")]
-        [string]$Status = "pending",
+        [string]$Status,
         
-        [Parameter(ParameterSetName = "Status")]
-        [int]$Limit = $(if ($null -ne $script:XO_DEFAULT_LIMIT) { $script:XO_DEFAULT_LIMIT } else { 25 })
+        [Parameter(ParameterSetName = "Filter")]
+        [int]$Limit = $script:XoSessionLimit
     )
 
-    if (-not $script:XoHost -or -not $script:XoRestParameters) {
-        throw "Not connected to Xen Orchestra. Call Connect-XoSession first."
-    }
-    
-    $params = @{
-        fields = $script:XO_TASK_FIELDS
-    }
-
-    if ($PSCmdlet.ParameterSetName -eq "TaskId") {
-        foreach ($id in $TaskId) {
-            Get-XoSingleTaskById -TaskId $id -Params $params
+    begin {
+        if (-not $script:XoHost -or -not $script:XoRestParameters) {
+            throw ("Not connected to Xen Orchestra. Call Connect-XoSession first.")
         }
-        return
-    }
-
-    try {
-        $params['filter'] = $Status
         
-        if ($Limit -ne 0) {
+        $params = @{
+            fields = $script:XO_TASK_FIELDS
+        }
+
+        if ($PSCmdlet.ParameterSetName -eq "Filter" -and $PSBoundParameters.ContainsKey('Status')) {
+            $params['filter'] = $Status
+        }
+
+        if ($PSCmdlet.ParameterSetName -eq "Filter" -and $Limit -ne 0) {
             $params['limit'] = $Limit
             if (!$PSBoundParameters.ContainsKey('Limit')) {
                 Write-Warning "No limit specified. Using default limit of $Limit. Use -Limit 0 for unlimited results."
             }
         }
-        
-        Write-Verbose "Getting tasks with parameters: $($params | ConvertTo-Json -Compress)"
-        $uri = "$script:XoHost/rest/v0/tasks"
-        $response = Invoke-RestMethod -Uri $uri @script:XoRestParameters -Body ($params | ConvertTo-Json -Compress) -Method Get
-        
-        if ($null -eq $response -or $response.Count -eq 0) {
-            Write-Verbose "No tasks found with status: $Status"
-            return
-        }
-        
-        Write-Verbose "Found $($response.Count) tasks"
-        
-        # Apply limit if needed
-        $tasksToProcess = $response
-        if ($Limit -gt 0 -and $response.Count -gt $Limit) {
-            $tasksToProcess = $response[0..($Limit-1)]
-        }
-        
-        foreach ($taskUrl in $tasksToProcess) {
-            if ($taskUrl -is [string] -and $taskUrl -match '/tasks/([0-9a-z]+)') {
-                $id = $matches[1]
-            
+    }
+    
+    process {
+        if ($PSCmdlet.ParameterSetName -eq "TaskId") {
+            foreach ($id in $TaskId) {
                 Get-XoSingleTaskById -TaskId $id -Params $params
             }
-            else {
-                if ($taskUrl -is [PSObject] -or $taskUrl -is [Hashtable]) {
-                    ConvertTo-XoTaskObject -InputObject $taskUrl
+        }
+    }
+    
+    end {
+        if ($PSCmdlet.ParameterSetName -eq "Filter") {
+            try {
+                Write-Verbose "Getting tasks with parameters: $($params | ConvertTo-Json -Compress)"
+                $uri = "$script:XoHost/rest/v0/tasks"
+                $tasksResponse = Invoke-RestMethod -Uri $uri @script:XoRestParameters -Body $params
+                
+                if ($null -eq $tasksResponse -or $tasksResponse.Count -eq 0) {
+                    Write-Verbose "No tasks found matching criteria"
+                    return
                 }
-                else {
-                    Write-Verbose "Skipping unknown task format: $taskUrl"
+                
+                Write-Verbose "Found $($tasksResponse.Count) tasks"
+                
+                $tasksToProcess = $tasksResponse
+                if ($Limit -gt 0 -and $tasksResponse.Count -gt $Limit) {
+                    $tasksToProcess = $tasksResponse[0..($Limit-1)]
+                }
+                
+                foreach ($taskItem in $tasksToProcess) {
+                    ConvertTo-XoTaskObject -InputObject $taskItem
+                }
+            } catch {
+                if ($PSBoundParameters.ContainsKey('Status')) {
+                    throw ("Failed to retrieve tasks with status {0}: {1}" -f $Status, $_)
+                } else {
+                    throw ("Failed to retrieve tasks: {0}" -f $_)
                 }
             }
         }
-    } catch {
-        throw ("Failed to retrieve tasks with status {0}: {1}" -f $Status, $_)
     }
 }
 
