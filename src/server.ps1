@@ -20,7 +20,7 @@ function ConvertTo-XoServerObject {
 
     process {
         $props = @{
-            ServerUuid = $InputObject.id
+            ServerUuid = $InputObject.id  # API returns 'id' field, not 'uuid' for servers
             Name       = $InputObject.label
             NameHost   = $InputObject.host
             Address    = $InputObject.address
@@ -65,30 +65,6 @@ function Get-XoSingleServerById {
     return $null
 }
 
-function Get-XoServerDetailFromUrl {
-    param(
-        [string]$ServerPath
-    )
-    
-    if ([string]::IsNullOrEmpty($ServerPath)) {
-        return $null
-    }
-    
-    if ($ServerPath -match "/servers/([^/]+)") {
-        $serverId = $matches[1]
-        $serverDetailUri = "$script:XoHost/rest/v0/servers/$serverId"
-        
-        try {
-            Write-Verbose "Fetching server details for ID $serverId from URL"
-            $serverDetail = Invoke-RestMethod -Uri $serverDetailUri @script:XoRestParameters
-            return ConvertTo-XoServerObject -InputObject $serverDetail
-        } catch {
-            throw ("Error fetching server detail for ID {0}: {1}" -f $serverId, $_)
-        }
-    }
-    return $ServerPath
-}
-
 function Get-XoServer {
     <#
     .SYNOPSIS
@@ -115,7 +91,10 @@ function Get-XoServer {
         Get-XoServer -Filter "status:connected"
         Returns connected servers (up to default limit).
     #>
-    [CmdletBinding(DefaultParameterSetName = "All")]
+    [CmdletBinding(DefaultParameterSetName = "Filter")]
+    # Parameter sets:
+    # - "Filter": Gets servers with optional filtering criteria (with optional limit)
+    # - "ServerUuid": Gets specific servers by UUID
     param(
         [Parameter(Mandatory, ValueFromPipelineByPropertyName, Position = 0, ParameterSetName = "ServerUuid")]
         [Alias("ServerId")]
@@ -125,7 +104,6 @@ function Get-XoServer {
         [string]$Filter,
 
         [Parameter(ParameterSetName = "Filter")]
-        [Parameter(ParameterSetName = "All")]
         [int]$Limit = $script:XoSessionLimit
     )
 
@@ -140,7 +118,7 @@ function Get-XoServer {
             $params['filter'] = $Filter
         }
         
-        if ($Limit -ne 0 -and ($PSCmdlet.ParameterSetName -eq "Filter" -or $PSCmdlet.ParameterSetName -eq "All")) {
+        if ($Limit -ne 0 -and $PSCmdlet.ParameterSetName -eq "Filter") {
             $params['limit'] = $Limit
             if (!$PSBoundParameters.ContainsKey('Limit')) {
                 Write-Warning "No limit specified. Using default limit of $Limit. Use -Limit 0 for unlimited results."
@@ -157,7 +135,7 @@ function Get-XoServer {
     }
     
     end {
-        if ($PSCmdlet.ParameterSetName -eq "All" -or $PSCmdlet.ParameterSetName -eq "Filter") {
+        if ($PSCmdlet.ParameterSetName -eq "Filter") {
             try {
                 Write-Verbose "Getting servers with parameters: $($params | ConvertTo-Json -Compress)"
                 $uri = "$script:XoHost/rest/v0/servers"
@@ -170,12 +148,7 @@ function Get-XoServer {
                 
                 Write-Verbose "Found $($response.Count) servers"
                 
-                $serversToProcess = $response
-                if ($Limit -gt 0 -and $response.Count -gt $Limit) {
-                    $serversToProcess = $response[0..($Limit-1)]
-                }
-                
-                foreach ($serverItem in $serversToProcess) {
+                foreach ($serverItem in $response) {
                     ConvertTo-XoServerObject -InputObject $serverItem
                 }
             } catch {

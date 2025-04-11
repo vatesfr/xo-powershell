@@ -50,30 +50,6 @@ function ConvertTo-XoVmObject {
     }
 }
 
-function Get-XoVmDetailFromPath {
-    param(
-        [string]$VmPath
-    )
-    
-    if ([string]::IsNullOrEmpty($VmPath)) {
-        return $null
-    }
-    
-    if ($VmPath -match "/vms/([^/]+)") {
-        $vmId = $matches[1]
-        $vmDetailUri = "$script:XoHost/rest/v0/vms/$vmId"
-        $detailParams = @{ fields = $script:XO_VM_FIELDS }
-        
-        try {
-            $vmDetails = Invoke-RestMethod -Uri $vmDetailUri @script:XoRestParameters -Body $detailParams
-            return $vmDetails
-        } catch {
-            throw ("Error fetching VM detail for ID {0}: {1}" -f $vmId, $_)
-        }
-    }
-    return $null
-}
-
 function Get-XoSingleVmById {
     param (
         [string]$VmUuid
@@ -205,12 +181,7 @@ function Get-XoVm {
                 
                 Write-Verbose "Found $($response.Count) VMs"
 
-                $vmsToProcess = $response
-                if ($Limit -gt 0 -and $response.Count -gt $Limit) {
-                    $vmsToProcess = $response[0..($Limit-1)]
-                }
-
-                foreach ($vmItem in $vmsToProcess) {
+                foreach ($vmItem in $response) {
                     ConvertTo-XoVmObject -InputObject $vmItem
                 }
             }
@@ -524,7 +495,7 @@ function Get-XoVmSnapshot {
         Get-XoVmSnapshot -Filter "name_label:backup"
         Returns VM snapshots with "backup" in their name (up to default limit).
     #>
-    [CmdletBinding(DefaultParameterSetName = "All")]
+    [CmdletBinding(DefaultParameterSetName = "Filter")]
     param(
         [Parameter(Mandatory, ValueFromPipelineByPropertyName, Position = 0, ParameterSetName = "VmSnapshotUuid")]
         [ValidateNotNullOrEmpty()]
@@ -535,7 +506,6 @@ function Get-XoVmSnapshot {
         [string]$Filter,
 
         [Parameter(ParameterSetName = "Filter")]
-        [Parameter(ParameterSetName = "All")]
         [int]$Limit = $script:XoSessionLimit
     )
 
@@ -575,7 +545,7 @@ function Get-XoVmSnapshot {
     }
     
     end {
-        if ($PSCmdlet.ParameterSetName -eq "All" -or $PSCmdlet.ParameterSetName -eq "Filter") {
+        if ($PSCmdlet.ParameterSetName -eq "Filter") {
             try {
                 $uri = "$script:XoHost/rest/v0/vm-snapshots"
                 Write-Verbose "Getting VM snapshots from $uri with parameters: $($params | ConvertTo-Json -Compress)"
@@ -589,12 +559,7 @@ function Get-XoVmSnapshot {
                 
                 Write-Verbose "Found $($snapshotsResponse.Count) VM snapshots"
                 
-                $snapshotsToProcess = $snapshotsResponse
-                if ($Limit -gt 0 -and $snapshotsResponse.Count -gt $Limit) {
-                    $snapshotsToProcess = $snapshotsResponse[0..($Limit-1)]
-                }
-                
-                foreach ($snapshotItem in $snapshotsToProcess) {
+                foreach ($snapshotItem in $snapshotsResponse) {
                     ConvertTo-XoVmSnapshotObject $snapshotItem
                 }
             }

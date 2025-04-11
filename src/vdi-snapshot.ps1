@@ -34,23 +34,6 @@ function ConvertTo-XoVdiSnapshotObject {
     }
 }
 
-function Get-XoVdiSnapshotIdFromItem {
-    param(
-        [Parameter(Mandatory)]
-        $VdiSnapshotItem
-    )
-    
-    if ($VdiSnapshotItem -match "/vdi-snapshots/([^/]+)") {
-        return $matches[1]
-    }
-    
-    if ($VdiSnapshotItem.PSObject.Properties.Name -contains 'uuid') {
-        return $VdiSnapshotItem.uuid
-    }
-    
-    return $null
-}
-
 function Get-XoSingleVdiSnapshotById {
     param (
         [string]$VdiSnapshotUuid,

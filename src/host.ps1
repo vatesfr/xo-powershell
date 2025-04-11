@@ -74,31 +74,6 @@ function Get-XoSingleHostById {
     return $null
 }
 
-function Get-XoHostDetailFromPath {
-    param(
-        [string]$HostPath
-    )
-    
-    if ([string]::IsNullOrEmpty($HostPath)) {
-        return $null
-    }
-    
-    if ($HostPath -match "/hosts/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})") {
-        $hostUuid = $matches[1]
-        $hostDetailUri = "$script:XoHost/rest/v0/hosts/$hostUuid"
-        $detailParams = @{ fields = $script:XO_HOST_FIELDS }
-        
-        try {
-            $response = Invoke-RestMethod -Uri $hostDetailUri @script:XoRestParameters -Body $detailParams
-            return ConvertTo-XoHostObject -InputObject $response
-        } catch {
-            Write-Warning "Error fetching host detail for UUID $hostUuid. Error: $_"
-            return $null
-        }
-    }
-    return $HostPath
-}
-
 function Get-XoHost {
     <#
     .SYNOPSIS
@@ -125,7 +100,10 @@ function Get-XoHost {
         Get-XoHost -Filter "power_state:running"
         Returns running hosts (up to default limit).
     #>
-    [CmdletBinding(DefaultParameterSetName = "All")]
+    [CmdletBinding(DefaultParameterSetName = "Filter")]
+    # Parameter sets:
+    # - "Filter": Gets hosts with optional filtering criteria (with optional limit)
+    # - "HostUuid": Gets specific hosts by UUID
     param(
         [Parameter(Mandatory, ValueFromPipelineByPropertyName, Position = 0, ParameterSetName = "HostUuid")]
         [ValidatePattern("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")]
@@ -136,7 +114,6 @@ function Get-XoHost {
         [string]$Filter,
         
         [Parameter(ParameterSetName = "Filter")]
-        [Parameter(ParameterSetName = "All")]
         [int]$Limit = $script:XoSessionLimit
     )
 
@@ -151,7 +128,7 @@ function Get-XoHost {
             $params['filter'] = $Filter
         }
         
-        if ($Limit -ne 0 -and ($PSCmdlet.ParameterSetName -eq "Filter" -or $PSCmdlet.ParameterSetName -eq "All")) {
+        if ($Limit -ne 0 -and $PSCmdlet.ParameterSetName -eq "Filter") {
             $params['limit'] = $Limit
             if (!$PSBoundParameters.ContainsKey('Limit')) {
                 Write-Warning "No limit specified. Using default limit of $Limit. Use -Limit 0 for unlimited results."
@@ -168,7 +145,7 @@ function Get-XoHost {
     }
     
     end {
-        if ($PSCmdlet.ParameterSetName -eq "All" -or $PSCmdlet.ParameterSetName -eq "Filter") {
+        if ($PSCmdlet.ParameterSetName -eq "Filter") {
             try {
                 $uri = "$script:XoHost/rest/v0/hosts"
                 $hostsResponse = Invoke-RestMethod -Uri $uri @script:XoRestParameters -Body $params
@@ -178,12 +155,7 @@ function Get-XoHost {
                     return
                 }
 
-                $hostsToProcess = $hostsResponse
-                if ($Limit -gt 0 -and $hostsResponse.Count -gt $Limit) {
-                    $hostsToProcess = $hostsResponse[0..($Limit-1)]
-                }
-
-                foreach ($hostItem in $hostsToProcess) {
+                foreach ($hostItem in $hostsResponse) {
                     ConvertTo-XoHostObject -InputObject $hostItem
                 }
             } catch {

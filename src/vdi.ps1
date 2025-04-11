@@ -36,23 +36,6 @@ function ConvertTo-XoVdiObject {
     }
 }
 
-function Get-XoVdiIdFromItem {
-    param(
-        [Parameter(Mandatory)]
-        $VdiItem
-    )
-    
-    if ($VdiItem -match "/vdis/([^/]+)") {
-        return $matches[1]
-    }
-    
-    if ($VdiItem.PSObject.Properties.Name -contains 'uuid') {
-        return $VdiItem.uuid
-    }
-    
-    return $null
-}
-
 function Get-XoSingleVdiById {
     param (
         [string]$VdiUuid,
@@ -222,17 +205,15 @@ function Export-XoVdi {
     )
 
     process {
-        $resolvedPath = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($OutFile)
-        
-        if ($PSCmdlet.ShouldProcess($VdiUuid, "export to $resolvedPath in $Format format")) {
+        if ($PSCmdlet.ShouldProcess($VdiUuid, "export to $OutFile in $Format format")) {
             try {
                 $uri = "$script:XoHost/rest/v0/vdis/$VdiUuid/export"
                 $params = @{ format = $Format }
                 
-                Invoke-RestMethod -Uri $uri @script:XoRestParameters -Body $params -OutFile $resolvedPath
+                Invoke-RestMethod -Uri $uri @script:XoRestParameters -Body $params -OutFile $OutFile
                 
                 if ($PassThru) {
-                    Get-Item $resolvedPath
+                    Get-Item $OutFile
                 }
             } catch {
                 throw ("Failed to export VDI with UUID {0}: {1}" -f $VdiUuid, $_)

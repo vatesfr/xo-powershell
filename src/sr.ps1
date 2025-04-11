@@ -52,31 +52,6 @@ function Get-XoSingleSrById {
     return $null
 }
 
-function Get-XoSrDetailFromPath {
-    param(
-        [string]$SrPath
-    )
-    
-    if ([string]::IsNullOrEmpty($SrPath)) {
-        return $null
-    }
-    
-    if ($SrPath -match "/srs/([^/]+)") {
-        $srUuid = $matches[1]
-        $srDetailUri = "$script:XoHost/rest/v0/srs/$srUuid"
-        
-        try {
-            Write-Verbose "Fetching SR details for UUID $srUuid from URL"
-            $srDetail = Invoke-RestMethod -Uri $srDetailUri @script:XoRestParameters
-            return $srDetail
-        } catch {
-            Write-Warning "Error fetching SR detail for UUID $srUuid. Error: $_"
-            return $null
-        }
-    }
-    return $SrPath
-}
-
 function Get-XoSr {
     <#
     .SYNOPSIS
@@ -102,7 +77,10 @@ function Get-XoSr {
         Get-XoSr -Limit 5
         Returns the first 5 SRs.
     #>
-    [CmdletBinding(DefaultParameterSetName = "All")]
+    [CmdletBinding(DefaultParameterSetName = "Filter")]
+    # Parameter sets:
+    # - "Filter": Gets SRs with optional filtering criteria (with optional limit)
+    # - "SrUuid": Gets specific SRs by UUID
     param(
         [Parameter(Mandatory, ValueFromPipelineByPropertyName, Position = 0, ParameterSetName = "SrUuid")]
         [ValidatePattern("[0-9a-z-]+")]
@@ -110,7 +88,6 @@ function Get-XoSr {
         [string[]]$SrUuid,
         
         [Parameter(ParameterSetName = "Filter")]
-        [Parameter(ParameterSetName = "All")]
         [int]$Limit = $script:XoSessionLimit
     )
 
@@ -123,7 +100,7 @@ function Get-XoSr {
             fields = $script:XO_SR_FIELDS
         }
         
-        if ($Limit -ne 0 -and ($PSCmdlet.ParameterSetName -eq "Filter" -or $PSCmdlet.ParameterSetName -eq "All")) {
+        if ($Limit -ne 0 -and $PSCmdlet.ParameterSetName -eq "Filter") {
             $params['limit'] = $Limit
             if (!$PSBoundParameters.ContainsKey('Limit')) {
                 Write-Warning "No limit specified. Using default limit of $Limit. Use -Limit 0 for unlimited results."
@@ -140,7 +117,7 @@ function Get-XoSr {
     }
     
     end {
-        if ($PSCmdlet.ParameterSetName -eq "All" -or $PSCmdlet.ParameterSetName -eq "Filter") {
+        if ($PSCmdlet.ParameterSetName -eq "Filter") {
             try {
                 Write-Verbose "Getting SRs with parameters: $($params | ConvertTo-Json -Compress)"
                 $uri = "$script:XoHost/rest/v0/srs"
@@ -153,12 +130,7 @@ function Get-XoSr {
                 
                 Write-Verbose "Found $($response.Count) SRs"
                 
-                $srsToProcess = $response
-                if ($Limit -gt 0 -and $response.Count -gt $Limit) {
-                    $srsToProcess = $response[0..($Limit-1)]
-                }
-                
-                foreach ($srItem in $srsToProcess) {
+                foreach ($srItem in $response) {
                     ConvertTo-XoSrObject -InputObject $srItem
                 }
             } catch {
