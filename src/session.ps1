@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 $script:XO_DEFAULT_LIMIT = 25
+$script:XoSessionLimit = $script:XO_DEFAULT_LIMIT
 
 function Test-XoSession {
     <#
@@ -71,6 +72,9 @@ function Connect-XoSession {
     $script:XoHost = $HostName.TrimEnd("/")
     Write-Verbose "Connecting to Xen Orchestra at $script:XoHost"
 
+    # Reset session limit to default value on new connection
+    $script:XoSessionLimit = $script:XO_DEFAULT_LIMIT
+
     $needsSave = $SaveCredentials
 
     if ($PSCmdlet.ParameterSetName -eq "Credential") {
@@ -93,7 +97,6 @@ function Connect-XoSession {
         }
     }
 
-    # Add cert validation if requested
     if ($SkipCertificateCheck) {
         if ($PSVersionTable.PSVersion.Major -ge 6) {
             $script:XoRestParameters["SkipCertificateCheck"] = $true
@@ -161,6 +164,7 @@ function Disconnect-XoSession {
     }
     $script:XoHost = $null
     $script:XoRestParameters = $null
+    $script:XoSessionLimit = $script:XO_DEFAULT_LIMIT
 }
 New-Alias -Name Disconnect-XenOrchestra -Value Disconnect-XoSession
 
@@ -186,15 +190,9 @@ function Set-XoDefaultLimit {
         [int]$Limit
     )
 
-    # Initialize the variable if it doesn't exist
-    if ($null -eq $script:XO_DEFAULT_LIMIT) {
-        $script:XO_DEFAULT_LIMIT = 25
-        Write-Verbose "Default limit was not initialized, setting initial value to 25"
-    }
-
-    # Set the new limit
-    $oldLimit = $script:XO_DEFAULT_LIMIT
-    $script:XO_DEFAULT_LIMIT = $Limit
+    $oldLimit = $script:XoSessionLimit
+    
+    $script:XoSessionLimit = $Limit
     
     if ($Limit -eq 0) {
         Write-Verbose "Default limit for XO queries changed from $oldLimit to unlimited (0)"
