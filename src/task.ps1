@@ -204,12 +204,7 @@ function Get-XoTask {
                 
                 Write-Verbose "Found $($tasksResponse.Count) tasks"
                 
-                $tasksToProcess = $tasksResponse
-                if ($Limit -gt 0 -and $tasksResponse.Count -gt $Limit) {
-                    $tasksToProcess = $tasksResponse[0..($Limit-1)]
-                }
-                
-                foreach ($taskItem in $tasksToProcess) {
+                foreach ($taskItem in $tasksResponse) {
                     ConvertTo-XoTaskObject -InputObject $taskItem
                 }
             } catch {
