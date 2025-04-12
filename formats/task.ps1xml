@@ -15,7 +15,7 @@
                                 <PropertyName>TaskId</PropertyName>
                             </TableColumnItem>
                             <TableColumnItem>
-                                <PropertyName>Method</PropertyName>
+                                <PropertyName>Name</PropertyName>
                             </TableColumnItem>
                             <TableColumnItem>
                                 <PropertyName>Status</PropertyName>
@@ -23,9 +23,41 @@
                             <TableColumnItem>
                                 <PropertyName>StartTime</PropertyName>
                             </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>EndTime</PropertyName>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>Message</PropertyName>
+                            </TableColumnItem>
                         </TableColumnItems>
                     </TableRowEntry>
                 </TableRowEntries>
+                <TableHeaders>
+                    <TableColumnHeader>
+                        <Label>ID</Label>
+                        <Width>12</Width>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Name</Label>
+                        <Width>24</Width>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Status</Label>
+                        <Width>10</Width>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Start Time</Label>
+                        <Width>21</Width>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>End Time</Label>
+                        <Width>21</Width>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Message</Label>
+                        <Width>30</Width>
+                    </TableColumnHeader>
+                </TableHeaders>
             </TableControl>
         </View>
     </ViewDefinitions>

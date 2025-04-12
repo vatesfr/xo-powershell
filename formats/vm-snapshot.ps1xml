@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Configuration>
+<Configuration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/PowerShell/PowerShell/master/src/Schemas/Format.xsd">
     <ViewDefinitions>
         <View>
             <Name>XoPowershell.VmSnapshot</Name>
@@ -7,23 +8,12 @@
                 <TypeName>XoPowershell.VmSnapshot</TypeName>
             </ViewSelectedBy>
             <TableControl>
-                <TableHeaders>
-                    <TableColumnHeader>
-                        <Width>30</Width>
-                    </TableColumnHeader>
-                    <TableColumnHeader>
-                        <Width>22</Width>
-                    </TableColumnHeader>
-                    <TableColumnHeader>
-                        <Width>12</Width>
-                    </TableColumnHeader>
-                    <TableColumnHeader>
-                        <Width>36</Width>
-                    </TableColumnHeader>
-                </TableHeaders>
                 <TableRowEntries>
                     <TableRowEntry>
                         <TableColumnItems>
+                            <TableColumnItem>
+                                <PropertyName>VmSnapshotUuid</PropertyName>
+                            </TableColumnItem>
                             <TableColumnItem>
                                 <PropertyName>Name</PropertyName>
                             </TableColumnItem>
@@ -31,15 +21,47 @@
                                 <PropertyName>SnapshotTime</PropertyName>
                             </TableColumnItem>
                             <TableColumnItem>
-                                <PropertyName>PowerState</PropertyName>
+                                <ScriptBlock>
+                                    try { $_.CPUs } catch { "" }
+                                </ScriptBlock>
+                                <Alignment>Right</Alignment>
                             </TableColumnItem>
                             <TableColumnItem>
-                                <PropertyName>VmSnapshotUuid</PropertyName>
+                                <ScriptBlock>
+                                    if ($null -eq $_.Memory) { "" }
+                                    elseif ($_.Memory.PSObject.Properties.Name -contains 'size') { $_.Memory.size } 
+                                    else { "" }
+                                </ScriptBlock>
+                                <Alignment>Right</Alignment>
                             </TableColumnItem>
                         </TableColumnItems>
                     </TableRowEntry>
                 </TableRowEntries>
+                <TableHeaders>
+                    <TableColumnHeader>
+                        <Label>ID</Label>
+                        <Width>36</Width>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Name</Label>
+                        <Width>20</Width>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Snapshot Time</Label>
+                        <Width>30</Width>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>CPUs</Label>
+                        <Width>5</Width>
+                        <Alignment>Right</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Memory</Label>
+                        <Width>15</Width>
+                        <Alignment>Right</Alignment>
+                    </TableColumnHeader>
+                </TableHeaders>
             </TableControl>
         </View>
     </ViewDefinitions>
-</Configuration> 
+</Configuration>

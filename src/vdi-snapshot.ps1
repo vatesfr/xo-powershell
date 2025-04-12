@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
-$script:XO_VDI_SNAPSHOT_FIELDS = "name_label,size,uuid,snapshot_time,snapshot_of,sr_uuid"
+$script:XO_VDI_SNAPSHOT_FIELDS = "name_label,size,uuid,snapshot_time,snapshot_of,sr_uuid,usage"
 
 function ConvertTo-XoVdiSnapshotObject {
     <#
@@ -11,141 +11,134 @@ function ConvertTo-XoVdiSnapshotObject {
     .PARAMETER InputObject
         The VDI snapshot object from the API.
     #>
+    [CmdletBinding()]
+    [OutputType("XoPowershell.VdiSnapshot")]
     param(
-        [Parameter(Mandatory, ValueFromPipeline, Position = 0)]$InputObject
+        [Parameter(Mandatory, ValueFromPipeline, Position = 0)]
+        [PSObject] $InputObject
     )
 
     process {
         $props = @{
+            PSTypeName = "XoPowershell.VdiSnapshot"
             VdiSnapshotUuid = $InputObject.uuid
             Name = $InputObject.name_label
-            SnapshotTime = if ($InputObject.snapshot_time) { [System.DateTimeOffset]::FromUnixTimeSeconds($InputObject.snapshot_time).ToLocalTime() } else { $null }
-            VdiSnapshotSize = Format-XoSize $InputObject.size
-            SnapshotOfVdi = $InputObject.snapshot_of
+            Size = $InputObject.size
+            SnapshotOf = $InputObject.snapshot_of
+            SnapshotTime = $InputObject.snapshot_time
             SrUuid = $InputObject.sr_uuid
+            Usage = $InputObject.usage
         }
-        Set-XoObject $InputObject -TypeName XoPowershell.VdiSnapshot -Properties $props
+        
+        [PSCustomObject]$props
     }
+}
+
+function Get-XoSingleVdiSnapshotById {
+    param (
+        [string]$VdiSnapshotUuid,
+        [hashtable]$Params
+    )
+    
+    try {
+        Write-Verbose "Getting VDI snapshot with UUID $VdiSnapshotUuid"
+        $uri = "$script:XoHost/rest/v0/vdi-snapshots/$VdiSnapshotUuid"
+        $snapshotData = Invoke-RestMethod -Uri $uri @script:XoRestParameters -Body $Params
+        
+        if ($snapshotData) {
+            return ConvertTo-XoVdiSnapshotObject -InputObject $snapshotData
+        }
+    } catch {
+        throw ("Failed to retrieve VDI snapshot with UUID {0}: {1}" -f $VdiSnapshotUuid, $_)
+    }
+    return $null
 }
 
 function Get-XoVdiSnapshot {
     <#
     .SYNOPSIS
-        Get VDI snapshots.
+        Get VDI snapshots from Xen Orchestra.
     .DESCRIPTION
-        Retrieves VDI snapshots from Xen Orchestra. Can retrieve specific snapshots by their ID
+        Retrieves VDI snapshots from Xen Orchestra. Can retrieve specific snapshots by their UUID
         or filter snapshots by various criteria.
-    .PARAMETER SnapshotId
-        The ID(s) of the snapshot(s) to retrieve.
+    .PARAMETER VdiSnapshotUuid
+        The UUID(s) of the VDI snapshot(s) to retrieve.
     .PARAMETER Filter
         Filter to apply to the snapshot query.
     .PARAMETER Limit
-        Maximum number of results to return.
+        Maximum number of results to return. Default is 25 if not specified.
     .EXAMPLE
-        Get-XoVdiSnapshot -SnapshotId "a1b2c3d4"
-        Returns the VDI snapshot with the specified ID.
+        Get-XoVdiSnapshot
+        Returns up to 25 VDI snapshots.
     .EXAMPLE
-        Get-XoVdiSnapshot -Filter "name_label:backup"
-        Returns all VDI snapshots with "backup" in their name.
+        Get-XoVdiSnapshot -Limit 0
+        Returns all VDI snapshots without limit.
+    .EXAMPLE
+        Get-XoVdiSnapshot -VdiSnapshotUuid "12345678-abcd-1234-abcd-1234567890ab"
+        Returns the VDI snapshot with the specified UUID.
+    .EXAMPLE
+        Get-XoVdiSnapshot -Filter "name_label:backup*"
+        Returns VDI snapshots with names starting with "backup" (up to default limit).
     #>
-    [CmdletBinding(DefaultParameterSetName = "All")]
+    [CmdletBinding(DefaultParameterSetName = "Filter")]
     param(
-        [Parameter(Mandatory, ValueFromPipelineByPropertyName, Position = 0, ParameterSetName = "SnapshotId")]
-        [ValidatePattern("[0-9a-z]+")]
-        [Alias("VdiSnapshotUuid")]
-        [string[]]$SnapshotId,
-
+        [Parameter(Mandatory, ValueFromPipelineByPropertyName, Position = 0, ParameterSetName = "VdiSnapshotUuid")]
+        [Alias("VdiSnapshotId")]
+        [string[]]$VdiSnapshotUuid,
+        
         [Parameter(ParameterSetName = "Filter")]
         [string]$Filter,
 
         [Parameter(ParameterSetName = "Filter")]
-        [Parameter(ParameterSetName = "All")]
-        [int]$Limit
+        [int]$Limit = $script:XoSessionLimit
     )
 
     begin {
-        $params = Remove-XoEmptyValues @{
-            fields = $script:XO_VDI_SNAPSHOT_FIELDS
-            filter = $Filter
-            limit = $Limit
+        if (-not $script:XoHost -or -not $script:XoRestParameters) {
+            throw ("Not connected to Xen Orchestra. Call Connect-XoSession first.")
+        }
+        
+        $params = @{ fields = $script:XO_VDI_SNAPSHOT_FIELDS }
+        
+        if ($Filter) {
+            $params['filter'] = $Filter
+        }
+        
+        if ($Limit -ne 0 -and $PSCmdlet.ParameterSetName -eq "Filter") {
+            $params['limit'] = $Limit
+            if (!$PSBoundParameters.ContainsKey('Limit')) {
+                Write-Warning "No limit specified. Using default limit of $Limit. Use -Limit 0 for unlimited results."
+            }
         }
     }
-
+    
     process {
-        if ($PSCmdlet.ParameterSetName -eq "SnapshotId") {
-            foreach ($id in $SnapshotId) {
-                try {
-                    Write-Verbose "Getting VDI snapshot with ID $id"
-                    $snapshotData = Invoke-RestMethod -Uri "$script:XoHost/rest/v0/vdi-snapshots/$id" @script:XoRestParameters -Body $params
-                    if ($snapshotData) {
-                        ConvertTo-XoVdiSnapshotObject $snapshotData
-                    } else {
-                        Write-Warning "No VDI snapshot found with ID $id"
-                    }
-                }
-                catch {
-                    Write-Error "Failed to retrieve VDI snapshot with ID $id. $_"
-                }
+        if ($PSCmdlet.ParameterSetName -eq "VdiSnapshotUuid") {
+            foreach ($id in $VdiSnapshotUuid) {
+                Get-XoSingleVdiSnapshotById -VdiSnapshotUuid $id -Params $params
             }
         }
     }
-
+    
     end {
-        if ($PSCmdlet.ParameterSetName -eq "All" -or $PSCmdlet.ParameterSetName -eq "Filter") {
+        if ($PSCmdlet.ParameterSetName -eq "Filter") {
             try {
-                Write-Verbose "Getting all VDI snapshots"
-                $response = Invoke-RestMethod -Uri "$script:XoHost/rest/v0/vdi-snapshots" @script:XoRestParameters -Body $params
-
-                if ($null -ne $response -and $response.Count -gt 0) {
-                    Write-Verbose "Found $($response.Count) VDI snapshot URLs"
-
-                    $maxToProcess = if ($Limit -gt 0) { $Limit } else { $response.Count }
-                    Write-Verbose "Will process up to $maxToProcess snapshots"
-
-                    $processedCount = 0
-                    foreach ($item in $response) {
-                        if ($processedCount -ge $maxToProcess) { break }
-
-                        try {
-                            $id = $null
-
-                            if ($item -is [string]) {
-                                if ($item -match '\/vdi-snapshots\/([^\/]+)(?:$|\?)') {
-                                    $id = $matches[1]
-                                    Write-Verbose "Extracted ID $id from URL $item"
-                                }
-                            }
-                            elseif ($item.PSObject.Properties.Name -contains 'id') {
-                                $id = $item.id
-                                Write-Verbose "Found ID $id in object"
-                            }
-                            elseif ($item.PSObject.Properties.Name -contains 'uuid') {
-                                $id = $item.uuid
-                                Write-Verbose "Found UUID $id in object"
-                            }
-
-                            if ($id) {
-                                $snapshotData = Invoke-RestMethod -Uri "$script:XoHost/rest/v0/vdi-snapshots/$id" @script:XoRestParameters
-                                if ($snapshotData) {
-                                    ConvertTo-XoVdiSnapshotObject $snapshotData
-                                    $processedCount++
-                                }
-                            } else {
-                                Write-Verbose "Could not extract ID from item: $item"
-                            }
-                        }
-                        catch {
-                            Write-Warning "Failed to process VDI snapshot. $_"
-                        }
-                    }
-
-                    Write-Verbose "Processed $processedCount VDI snapshots"
-                } else {
-                    Write-Verbose "No VDI snapshots found"
+                Write-Verbose "Getting VDI snapshots with parameters: $($params | ConvertTo-Json -Compress)"
+                $uri = "$script:XoHost/rest/v0/vdi-snapshots"
+                $response = Invoke-RestMethod -Uri $uri @script:XoRestParameters -Body $params
+                
+                if (!$response -or $response.Count -eq 0) {
+                    Write-Verbose "No VDI snapshots found matching criteria"
+                    return
                 }
-            }
-            catch {
-                Write-Error "Failed to retrieve VDI snapshots. $_"
+                
+                Write-Verbose "Found $($response.Count) VDI snapshots"
+                
+                foreach ($snapshotItem in $response) {
+                    ConvertTo-XoVdiSnapshotObject -InputObject $snapshotItem
+                }
+            } catch {
+                throw ("Failed to list VDI snapshots. Error: {0}" -f $_)
             }
         }
     }
@@ -154,58 +147,60 @@ function Get-XoVdiSnapshot {
 function Export-XoVdiSnapshot {
     <#
     .SYNOPSIS
-        Export a VDI snapshot to a file.
+        Export a VDI snapshot.
     .DESCRIPTION
-        Exports a VDI snapshot in either VHD or RAW format to a local file.
-    .PARAMETER SnapshotId
-        The ID of the VDI snapshot to export.
+        Export a VDI snapshot from Xen Orchestra. Downloads the snapshot to a local file.
+    .PARAMETER VdiSnapshotUuid
+        The UUID of the VDI snapshot to export.
     .PARAMETER Format
-        The format to export the snapshot in (vhd or raw).
+        The format to export the VDI snapshot in. Valid values: raw, vhd.
     .PARAMETER OutFile
-        The path to save the exported snapshot to.
-    .PARAMETER PreferNbd
-        Whether to prefer using NBD for the export.
-    .PARAMETER NbdConcurrency
-        The number of concurrent NBD connections to use.
+        The path to save the exported VDI snapshot to.
+    .PARAMETER PassThru
+        If specified, returns the exported file info as a FileInfo object.
     .EXAMPLE
-        Export-XoVdiSnapshot -SnapshotId "a1b2c3d4" -Format vhd -OutFile "/path/to/export.vhd"
-        Exports the VDI snapshot as a VHD file.
+        Export-XoVdiSnapshot -VdiSnapshotUuid "12345678-abcd-1234-abcd-1234567890ab" -Format vhd -OutFile "C:\Exports\snapshot.vhd"
+        Exports the VDI snapshot in VHD format to the specified file.
+    .EXAMPLE
+        Get-XoVdiSnapshot -VdiSnapshotUuid "12345678-abcd-1234-abcd-1234567890ab" | Export-XoVdiSnapshot -Format vhd -OutFile "C:\Exports\snapshot.vhd"
+        Exports the VDI snapshot in VHD format to the specified file, piping from Get-XoVdiSnapshot.
     #>
-    [CmdletBinding()]
-    param(
+    [CmdletBinding(SupportsShouldProcess)]
+    param (
         [Parameter(Mandatory, ValueFromPipelineByPropertyName)]
-        [ValidatePattern("[0-9a-z]+")]
-        [Alias("VdiSnapshotUuid")]
-        [string]$SnapshotId,
-
+        [ValidateNotNullOrEmpty()]
+        [Alias("VdiSnapshotId")]
+        [string]$VdiSnapshotUuid,
+        
         [Parameter(Mandatory)]
-        [ValidateSet("vhd", "raw")]
+        [ValidateSet("raw", "vhd")]
         [string]$Format,
 
         [Parameter(Mandatory)]
+        [ValidateNotNullOrEmpty()]
         [string]$OutFile,
 
         [Parameter()]
-        [switch]$PreferNbd,
-
-        [Parameter()]
-        [int]$NbdConcurrency
+        [switch]$PassThru
     )
 
+
     process {
-        $queryParams = Remove-XoEmptyValues @{
-            preferNbd = if ($PreferNbd) { "true" } else { $null }
-            nbdConcurrency = $NbdConcurrency
+        $resolvedPath = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($OutFile)
+        
+        if ($PSCmdlet.ShouldProcess($VdiSnapshotUuid, "export to $resolvedPath in $Format format")) {
+            try {
+                $uri = "$script:XoHost/rest/v0/vdi-snapshots/$VdiSnapshotUuid/export"
+                $params = @{ format = $Format }
+                
+                Invoke-RestMethod -Uri $uri @script:XoRestParameters -Body $params -OutFile $resolvedPath
+                
+                if ($PassThru) {
+                    Get-Item $resolvedPath
+                }
+            } catch {
+                throw ("Failed to export VDI snapshot with UUID {0}: {1}" -f $VdiSnapshotUuid, $_)
+            }
         }
-
-        $queryString = if ($queryParams.Count -gt 0) {
-            "?" + (($queryParams.GetEnumerator() | ForEach-Object { "$($_.Key)=$($_.Value)" }) -join "&")
-        } else { "" }
-
-        $uri = "$script:XoHost/rest/v0/vdi-snapshots/$SnapshotId.$Format$queryString"
-
-        Write-Verbose "Exporting VDI snapshot $SnapshotId to $OutFile in $Format format"
-        Invoke-RestMethod -Uri $uri @script:XoRestParameters -OutFile $OutFile
-        Write-Verbose "Export completed successfully"
     }
 }

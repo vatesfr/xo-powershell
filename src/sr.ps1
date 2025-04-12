@@ -3,8 +3,19 @@
 $script:XO_SR_FIELDS = "name_label,uuid,SR_type,content_type,allocationStrategy,size,physical_usage,usage,shared"
 
 function ConvertTo-XoSrObject {
+    <#
+    .SYNOPSIS
+        Convert a storage repository object from the API to a PowerShell object.
+    .DESCRIPTION
+        Convert a storage repository object from the API to a PowerShell object with proper properties and types.
+    .PARAMETER InputObject
+        The storage repository object from the API.
+    #>
+    [CmdletBinding()]
+    [OutputType("XoPowershell.Sr")]
     param(
-        [Parameter(Mandatory, ValueFromPipeline, Position = 0)]$InputObject
+        [Parameter(Mandatory, ValueFromPipeline, Position = 0)]
+        $InputObject
     )
 
     process {
@@ -21,114 +32,109 @@ function ConvertTo-XoSrObject {
     }
 }
 
+function Get-XoSingleSrById {
+    param (
+        [string]$SrUuid,
+        [hashtable]$Params
+    )
+    
+    try {
+        Write-Verbose "Getting SR with UUID $SrUuid"
+        $uri = "$script:XoHost/rest/v0/srs/$SrUuid"
+        $srData = Invoke-RestMethod -Uri $uri @script:XoRestParameters -Body $Params
+        
+        if ($srData) {
+            return ConvertTo-XoSrObject -InputObject $srData
+        }
+    } catch {
+        throw ("Failed to retrieve SR with UUID {0}: {1}" -f $SrUuid, $_)
+    }
+    return $null
+}
+
 function Get-XoSr {
     <#
     .SYNOPSIS
         Get storage repositories from Xen Orchestra.
     .DESCRIPTION
-        Retrieves storage repositories from Xen Orchestra. Can retrieve specific SRs by their ID
+        Retrieves storage repositories from Xen Orchestra. Can retrieve specific SRs by their UUID
         or all SRs.
-    .PARAMETER SrId
-        The ID(s) of the SR(s) to retrieve.
+    .PARAMETER SrUuid
+        The UUID(s) of the SR(s) to retrieve.
     .PARAMETER Limit
-        Maximum number of results to return when retrieving all SRs.
+        Maximum number of results to return. Default is 25 if not specified.
+        Use -Limit 0 to return all results without limitation.
     .EXAMPLE
         Get-XoSr
-        Returns all SRs.
+        Returns up to 25 SRs.
     .EXAMPLE
-        Get-XoSr -SrId "a1b2c3d4"
-        Returns the SR with the specified ID.
+        Get-XoSr -Limit 0
+        Returns all SRs without limit.
+    .EXAMPLE
+        Get-XoSr -SrUuid "a1b2c3d4"
+        Returns the SR with the specified UUID.
     .EXAMPLE
         Get-XoSr -Limit 5
         Returns the first 5 SRs.
     #>
-    [CmdletBinding(DefaultParameterSetName = "All")]
+    [CmdletBinding(DefaultParameterSetName = "Filter")]
+    # Parameter sets:
+    # - "Filter": Gets SRs with optional filtering criteria (with optional limit)
+    # - "SrUuid": Gets specific SRs by UUID
     param(
-        [Parameter(Mandatory, ValueFromPipelineByPropertyName, Position = 0, ParameterSetName = "SrId")]
-        [ValidatePattern("[0-9a-z]+")]
-        [string[]]$SrId,
-
-        [Parameter(ParameterSetName = "All")]
-        [int]$Limit
+        [Parameter(Mandatory, ValueFromPipelineByPropertyName, Position = 0, ParameterSetName = "SrUuid")]
+        [ValidatePattern("[0-9a-z-]+")]
+        [Alias("SrId")]
+        [string[]]$SrUuid,
+        
+        [Parameter(ParameterSetName = "Filter")]
+        [int]$Limit = $script:XoSessionLimit
     )
 
     begin {
-        $params = @{}
-        if ($PSBoundParameters.ContainsKey('Limit')) {
+        if (-not $script:XoHost -or -not $script:XoRestParameters) {
+            throw ("Not connected to Xen Orchestra. Call Connect-XoSession first.")
+        }
+        
+        $params = @{
+            fields = $script:XO_SR_FIELDS
+        }
+        
+        if ($Limit -ne 0 -and $PSCmdlet.ParameterSetName -eq "Filter") {
             $params['limit'] = $Limit
+            if (!$PSBoundParameters.ContainsKey('Limit')) {
+                Write-Warning "No limit specified. Using default limit of $Limit. Use -Limit 0 for unlimited results."
+            }
         }
     }
-
+    
     process {
-        if ($PSCmdlet.ParameterSetName -eq "SrId") {
-            foreach ($id in $SrId) {
-                try {
-                    $srData = Invoke-RestMethod -Uri "$script:XoHost/rest/v0/srs/$($id)" @script:XoRestParameters
-                    if ($srData) {
-                        ConvertTo-XoSrObject $srData
-                    }
-                }
-                catch {
-                    Write-Error "Failed to retrieve SR with ID $id. Error: $_"
-                }
+        if ($PSCmdlet.ParameterSetName -eq "SrUuid") {
+            foreach ($id in $SrUuid) {
+                Get-XoSingleSrById -SrUuid $id -Params $params
             }
         }
     }
-
+    
     end {
-        if ($PSCmdlet.ParameterSetName -eq "All") {
+        if ($PSCmdlet.ParameterSetName -eq "Filter") {
             try {
-                Write-Verbose "Getting all SRs"
-                $allSrUrls = Invoke-RestMethod -Uri "$script:XoHost/rest/v0/srs" @script:XoRestParameters
-
-                if ($allSrUrls -and $allSrUrls.Count -gt 0) {
-                    Write-Verbose "Found $($allSrUrls.Count) SRs"
-
-                    # Apply limit if specified
-                    $processLimit = if ($Limit -gt 0) { [Math]::Min($Limit, $allSrUrls.Count) } else { $allSrUrls.Count }
-                    $processUrls = $allSrUrls | Select-Object -First $processLimit
-
-                    foreach ($srUrl in $processUrls) {
-                        # Skip null or empty URLs
-                        if ([string]::IsNullOrEmpty($srUrl)) {
-                            Write-Verbose "Skipping empty URL"
-                            continue
-                        }
-
-                        try {
-                            # Extract the ID from the URL string
-                            $match = [regex]::Match($srUrl, "\/rest\/v0\/srs\/([^\/]+)$")
-                            if ($match.Success) {
-                                $id = $match.Groups[1].Value
-                                if (![string]::IsNullOrEmpty($id)) {
-                                    $srDetail = Invoke-RestMethod -Uri "$script:XoHost/rest/v0/srs/$id" @script:XoRestParameters
-                                    if ($srDetail) {
-                                        ConvertTo-XoSrObject $srDetail
-                                    }
-                                }
-                                else {
-                                    Write-Warning "Failed to extract valid ID from URL: $srUrl"
-                                }
-                            }
-                            else {
-                                Write-Warning "URL doesn't match expected pattern: $srUrl"
-                            }
-                        }
-                        catch {
-                            Write-Warning "Failed to process SR from URL $srUrl. Error: $_"
-                        }
-                    }
-
-                    if ($allSrUrls.Count -gt $processLimit) {
-                        Write-Warning "Only processed $processLimit of $($allSrUrls.Count) available SRs. Use -Limit parameter to adjust."
-                    }
-                }
-                else {
+                Write-Verbose "Getting SRs with parameters: $($params | ConvertTo-Json -Compress)"
+                $uri = "$script:XoHost/rest/v0/srs"
+                $response = Invoke-RestMethod -Uri $uri @script:XoRestParameters -Body $params
+                
+                if (!$response -or $response.Count -eq 0) {
                     Write-Verbose "No SRs found"
+                    return
                 }
-            }
-            catch {
-                Write-Error "Failed to retrieve SRs: $_"
+                
+                Write-Verbose "Found $($response.Count) SRs"
+                
+                foreach ($srItem in $response) {
+                    ConvertTo-XoSrObject -InputObject $srItem
+                }
+            } catch {
+                throw ("Failed to list SRs. Error: {0}" -f $_)
             }
         }
     }
