@@ -68,6 +68,10 @@
 
         # message
         "Get-XoMessage"
+
+        # network
+        "Get-XoNetwork"
+        "Set-XoNetwork"
     )
     AliasesToExport   = @(
         "Connect-XenOrchestra"
@@ -86,5 +90,6 @@
         "formats/host.ps1xml"
         "formats/pool.ps1xml"
         "formats/message.ps1xml"
+        "formats/network.ps1xml"
     )
 }
