@@ -29,10 +29,13 @@
                             <TableColumnItem>
                                 <ScriptBlock>
                                     if ($null -eq $_.Memory) { "" }
-                                    elseif ($_.Memory.PSObject.Properties.Name -contains 'size') { $_.Memory.size } 
+                                    elseif ($_.Memory.PSObject.Properties.Name -contains 'size') { $_.Memory.size }
                                     else { "" }
                                 </ScriptBlock>
                                 <Alignment>Right</Alignment>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>Description</PropertyName>
                             </TableColumnItem>
                         </TableColumnItems>
                     </TableRowEntry>
@@ -47,8 +50,8 @@
                         <Width>20</Width>
                     </TableColumnHeader>
                     <TableColumnHeader>
-                        <Label>Snapshot Time</Label>
-                        <Width>30</Width>
+                        <Label>SnapshotTime</Label>
+                        <Width>26</Width>
                     </TableColumnHeader>
                     <TableColumnHeader>
                         <Label>CPUs</Label>
@@ -59,6 +62,10 @@
                         <Label>Memory</Label>
                         <Width>15</Width>
                         <Alignment>Right</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Description</Label>
+                        <Width>30</Width>
                     </TableColumnHeader>
                 </TableHeaders>
             </TableControl>

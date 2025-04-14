@@ -45,9 +45,11 @@
         "Start-XoVm"
         "Stop-XoVm"
         "Restart-XoVm"
-        "New-XoVmSnapshot"
-        "Get-XoVmSnapshot"
         "Suspend-XoVm"
+
+        # vm-snapshot
+        "Get-XoVmSnapshot"
+        "New-XoVmSnapshot"
 
         # server
         "Get-XoServer"
