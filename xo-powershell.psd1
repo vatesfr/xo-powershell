@@ -23,6 +23,7 @@
 
         # sr
         "Get-XoSr"
+        "Set-XoSr"
 
         # task
         "Get-XoTask"
@@ -30,6 +31,7 @@
 
         # vdi
         "Get-XoVdi"
+        "Set-XoVdi"
         "Export-XoVdi"
 
         # vdi-snapshot
@@ -38,6 +40,7 @@
 
         # vm
         "Get-XoVm"
+        "Set-XoVm"
         "Get-XoVmVdi"
         "Start-XoVm"
         "Stop-XoVm"
@@ -51,9 +54,11 @@
 
         # host
         "Get-XoHost"
+        "Set-XoHost"
 
         # pool
         "Get-XoPool"
+        "Set-XoPool"
         "Get-XoPoolMessage"
         "Restart-XoPool"
         "Stop-XoPool"

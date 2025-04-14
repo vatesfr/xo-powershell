@@ -167,3 +167,38 @@ function Get-XoHost {
         }
     }
 }
+
+function Set-XoHost {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory, ValueFromPipelineByPropertyName, Position = 0)]
+        [Alias("HostId")]
+        [string]$HostUuid,
+
+        [Parameter()]
+        [string]$Name,
+
+        [Parameter()]
+        [string]$Description,
+
+        [Parameter()]
+        [string[]]$Tags
+    )
+
+    $params = @{}
+
+    if ($PSBoundParameters.ContainsKey("Name")) {
+        $params["name_label"] = $Name
+    }
+    if ($PSBoundParameters.ContainsKey("Description")) {
+        $params["name_description"] = $Description
+    }
+    if ($PSBoundParameters.ContainsKey("Tags")) {
+        $params["tags"] = $Tags
+    }
+
+    if ($params.Count -gt 0) {
+        $body = [System.Text.Encoding]::UTF8.GetBytes((ConvertTo-Json $params))
+        Invoke-RestMethod -Uri "$script:XoHost/rest/v0/hosts/$HostUuid" @script:XoRestParameters -Method Patch -ContentType "application/json" -Body $body
+    }
+}
