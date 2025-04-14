@@ -18,6 +18,8 @@
         "Test-XoSession"
         "Connect-XoSession"
         "Disconnect-XoSession"
+        "Get-XoSession"
+        "Set-XoSession"
 
         # sr
         "Get-XoSr"
