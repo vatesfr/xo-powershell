@@ -72,6 +72,10 @@
         # network
         "Get-XoNetwork"
         "Set-XoNetwork"
+
+        # pif
+        "Get-XoPif"
+        "Set-XoPif"
     )
     AliasesToExport   = @(
         "Connect-XenOrchestra"
@@ -91,5 +95,6 @@
         "formats/pool.ps1xml"
         "formats/message.ps1xml"
         "formats/network.ps1xml"
+        "formats/pif.ps1xml"
     )
 }
