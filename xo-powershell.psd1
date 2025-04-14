@@ -51,6 +51,16 @@
 
         # host
         "Get-XoHost"
+
+        # pool
+        "Get-XoPool"
+        "Get-XoPoolMessage"
+        "Restart-XoPool"
+        "Stop-XoPool"
+        "Update-XoPool"
+
+        # message
+        "Get-XoMessage"
     )
     AliasesToExport   = @(
         "Connect-XenOrchestra"
@@ -67,5 +77,7 @@
         "formats/vm-snapshot.ps1xml"
         "formats/server.ps1xml"
         "formats/host.ps1xml"
+        "formats/pool.ps1xml"
+        "formats/message.ps1xml"
     )
 }
