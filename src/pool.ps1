@@ -98,7 +98,7 @@ function Set-XoPool {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory, ValueFromPipelineByPropertyName, Position = 0)]
-        [Alias("PoolId")]
+        [Alias("PoolId", "`$pool")]
         [string]$PoolUuid,
 
         [Parameter()]

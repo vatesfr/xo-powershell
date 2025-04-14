@@ -71,7 +71,7 @@ function Get-XoVmSnapshot {
     param(
         [Parameter(Mandatory, ValueFromPipelineByPropertyName, Position = 0, ParameterSetName = "VmSnapshotUuid")]
         [ValidateNotNullOrEmpty()]
-        [Alias("SnapshotId", "SnapshotUuid")]
+        [Alias("Snapshot")]
         [string[]]$VmSnapshotUuid,
 
         [Parameter(ParameterSetName = "Filter")]

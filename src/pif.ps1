@@ -29,6 +29,7 @@ function Get-XoPif {
         # UUIDs of PIFs to query.
         [Parameter(Mandatory, ValueFromPipelineByPropertyName, Position = 0, ParameterSetName = "PifUuid")]
         [ValidatePattern("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")]
+        [Alias("PIFs")]
         [string[]]$PifUuid,
 
         # Find PIFs that match the specified name substring.
