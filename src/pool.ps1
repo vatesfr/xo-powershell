@@ -11,6 +11,7 @@ function ConvertTo-XoPoolObject {
         $props = @{
             PoolUuid        = $InputObject.uuid
             Name            = $InputObject.name_label
+            Description     = $InputObject.name_description
             CpuCores        = $InputObject.cpus.cores
             PlatformVersion = $InputObject.platform_version
             HAEnabled       = $InputObject.HA_enabled
@@ -72,10 +73,10 @@ function Get-XoPool {
                 filter = $AllFilters
                 fields = $script:XO_POOL_FIELDS
             }
+        }
 
-            if ($Limit) {
-                $params["limit"] = $Limit
-            }
+        if ($Limit) {
+            $params["limit"] = $Limit
         }
     }
 
