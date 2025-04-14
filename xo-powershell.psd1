@@ -76,6 +76,10 @@
         # pif
         "Get-XoPif"
         "Set-XoPif"
+
+        # vif
+        "Get-XoVif"
+        "Set-XoVif"
     )
     AliasesToExport   = @(
         "Connect-XenOrchestra"
@@ -96,5 +100,6 @@
         "formats/message.ps1xml"
         "formats/network.ps1xml"
         "formats/pif.ps1xml"
+        "formats/vif.ps1xml"
     )
 }
