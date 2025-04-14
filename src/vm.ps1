@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
-$script:XO_VM_FIELDS = "uuid,name_label,name_description,power_state,addresses,tags,memory,VIFs,snapshots,current_operations,auto_poweron,os_version,startTime,VCPUs_at_startup,CPUs,VCPUs_number"
+$script:XO_VM_FIELDS = "uuid,name_label,name_description,power_state,addresses,tags,memory,VIFs,snapshots,current_operations,auto_poweron,os_version,startTime,VCPUs_at_startup,CPUs,VCPUs_number,`$VBDs"
 
 function ConvertTo-XoVmObject {
     <#
@@ -19,34 +19,26 @@ function ConvertTo-XoVmObject {
     )
 
     process {
-        $vmObj = [PSCustomObject]@{
-            PSTypeName     = "XoPowershell.Vm"
-            VmUuid         = $InputObject.uuid
-            Name           = $InputObject.name_label
-            Description    = $InputObject.name_description
-            PowerState     = $InputObject.power_state
-            MainIpAddress  = $InputObject.mainIpAddress
-            OsVersion      = $InputObject.os_version
-            VIFs           = $InputObject.VIFs
-            VBDs           = $InputObject.$VBDs
-            Parent         = $InputObject.parent
-            Snapshots      = $InputObject.snapshots
-            HostUuid       = $InputObject.$container
-            XenstoreData   = $InputObject.xenStoreData
-            Tags           = $InputObject.tags
-            Memory         = $InputObject.memory
+        $props = @{
+            VmUuid      = $InputObject.uuid
+            Name        = $InputObject.name_label
+            Description = $InputObject.name_description
+            PowerState  = $InputObject.power_state
+            OsVersion   = $InputObject.os_version
+            Parent      = $InputObject.parent
+            HostUuid    = $InputObject.$container
         }
 
         if ($null -ne $InputObject.CPUs) {
             if ($InputObject.CPUs.PSObject.Properties.Name -contains 'number') {
-                $vmObj | Add-Member -MemberType NoteProperty -Name CPUs -Value $InputObject.CPUs.number
+                $props | Add-Member -MemberType NoteProperty -Name CPUs -Value $InputObject.CPUs.number
             }
             elseif ($InputObject.CPUs.PSObject.Properties.Name -contains 'max') {
-                $vmObj | Add-Member -MemberType NoteProperty -Name CPUs -Value $InputObject.CPUs.max
+                $props | Add-Member -MemberType NoteProperty -Name CPUs -Value $InputObject.CPUs.max
             }
         }
 
-        return $vmObj
+        Set-XoObject $InputObject -TypeName XoPowershell.Vm -Properties $props
     }
 }
 
