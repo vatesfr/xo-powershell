@@ -37,16 +37,17 @@ function Get-XoSingleSrById {
         [string]$SrUuid,
         [hashtable]$Params
     )
-    
+
     try {
         Write-Verbose "Getting SR with UUID $SrUuid"
         $uri = "$script:XoHost/rest/v0/srs/$SrUuid"
         $srData = Invoke-RestMethod -Uri $uri @script:XoRestParameters -Body $Params
-        
+
         if ($srData) {
             return ConvertTo-XoSrObject -InputObject $srData
         }
-    } catch {
+    }
+    catch {
         throw ("Failed to retrieve SR with UUID {0}: {1}" -f $SrUuid, $_)
     }
     return $null
@@ -86,7 +87,7 @@ function Get-XoSr {
         [ValidatePattern("[0-9a-z-]+")]
         [Alias("SrId")]
         [string[]]$SrUuid,
-        
+
         [Parameter(ParameterSetName = "Filter")]
         [int]$Limit = $script:XoSessionLimit
     )
@@ -95,11 +96,11 @@ function Get-XoSr {
         if (-not $script:XoHost -or -not $script:XoRestParameters) {
             throw ("Not connected to Xen Orchestra. Call Connect-XoSession first.")
         }
-        
+
         $params = @{
             fields = $script:XO_SR_FIELDS
         }
-        
+
         if ($Limit -ne 0 -and $PSCmdlet.ParameterSetName -eq "Filter") {
             $params['limit'] = $Limit
             if (!$PSBoundParameters.ContainsKey('Limit')) {
@@ -107,7 +108,7 @@ function Get-XoSr {
             }
         }
     }
-    
+
     process {
         if ($PSCmdlet.ParameterSetName -eq "SrUuid") {
             foreach ($id in $SrUuid) {
@@ -115,25 +116,26 @@ function Get-XoSr {
             }
         }
     }
-    
+
     end {
         if ($PSCmdlet.ParameterSetName -eq "Filter") {
             try {
                 Write-Verbose "Getting SRs with parameters: $($params | ConvertTo-Json -Compress)"
                 $uri = "$script:XoHost/rest/v0/srs"
                 $response = Invoke-RestMethod -Uri $uri @script:XoRestParameters -Body $params
-                
+
                 if (!$response -or $response.Count -eq 0) {
                     Write-Verbose "No SRs found"
                     return
                 }
-                
+
                 Write-Verbose "Found $($response.Count) SRs"
-                
+
                 foreach ($srItem in $response) {
                     ConvertTo-XoSrObject -InputObject $srItem
                 }
-            } catch {
+            }
+            catch {
                 throw ("Failed to list SRs. Error: {0}" -f $_)
             }
         }

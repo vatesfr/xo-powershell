@@ -100,7 +100,8 @@ function Connect-XoSession {
     if ($SkipCertificateCheck) {
         if ($PSVersionTable.PSVersion.Major -ge 6) {
             $script:XoRestParameters["SkipCertificateCheck"] = $true
-        } else {
+        }
+        else {
             Write-Warning "Certificate check skipping is only supported in PowerShell 6+. Using insecure handling method."
             if (-not ([System.Management.Automation.PSTypeName]'TrustAllCertsPolicy').Type) {
                 Add-Type @"
@@ -131,7 +132,8 @@ function Connect-XoSession {
         Write-Verbose "XoHost value: $script:XoHost"
         Write-Verbose "XoRestParameters: $($script:XoRestParameters.Headers | ConvertTo-Json -Compress)"
         return $true
-    } else {
+    }
+    else {
         Write-Error "Failed to connect to Xen Orchestra at $script:XoHost"
         $script:XoHost = $null
         $script:XoRestParameters = $null

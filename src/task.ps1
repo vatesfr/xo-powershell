@@ -19,34 +19,40 @@ function ConvertTo-XoTaskObject {
     )
 
     process {
-        $name = if ($InputObject.properties.name) { 
-            $InputObject.properties.name 
-        } elseif ($InputObject.properties.method) { 
-            $InputObject.properties.method 
-        } else { 
-            "Unknown" 
+        $name = if ($InputObject.properties.name) {
+            $InputObject.properties.name
+        }
+        elseif ($InputObject.properties.method) {
+            $InputObject.properties.method
+        }
+        else {
+            "Unknown"
         }
 
         $type = if ($InputObject.properties.type) { $InputObject.properties.type } else { "" }
 
-        $startTime = if ($InputObject.start -and $InputObject.start -gt 0) { 
-            [System.DateTimeOffset]::FromUnixTimeMilliseconds($InputObject.start).ToLocalTime() 
-        } else { 
-            $null 
+        $startTime = if ($InputObject.start -and $InputObject.start -gt 0) {
+            [System.DateTimeOffset]::FromUnixTimeMilliseconds($InputObject.start).ToLocalTime()
         }
-        
-        $endTime = if ($InputObject.end -and $InputObject.end -gt 0) { 
-            [System.DateTimeOffset]::FromUnixTimeMilliseconds($InputObject.end).ToLocalTime() 
-        } else { 
-            $null 
+        else {
+            $null
         }
-        
-        $message = if ($InputObject.result.message) { 
-            $InputObject.result.message 
-        } elseif ($InputObject.result.code) {
+
+        $endTime = if ($InputObject.end -and $InputObject.end -gt 0) {
+            [System.DateTimeOffset]::FromUnixTimeMilliseconds($InputObject.end).ToLocalTime()
+        }
+        else {
+            $null
+        }
+
+        $message = if ($InputObject.result.message) {
+            $InputObject.result.message
+        }
+        elseif ($InputObject.result.code) {
             $InputObject.result.code
-        } else { 
-            "" 
+        }
+        else {
+            ""
         }
 
         $props = @{
@@ -60,7 +66,7 @@ function ConvertTo-XoTaskObject {
             EndTime    = $endTime
             Message    = $message
         }
-        
+
         [PSCustomObject]$props
     }
 }
@@ -84,7 +90,7 @@ function ConvertFrom-XoTaskHref {
         if ($Uri -notmatch "\/rest\/v0\/tasks\/([0-9a-z]+)") {
             throw ("Bad task href format: {0}" -f $Uri)
         }
-        
+
         $taskId = $matches[1]
         Get-XoTask -TaskId $taskId
     }
@@ -106,16 +112,17 @@ function Get-XoSingleTaskById {
         [string]$TaskId,
         [hashtable]$Params
     )
-    
+
     try {
         Write-Verbose "Getting task with ID $TaskId"
         $uri = "$script:XoHost/rest/v0/tasks/$TaskId"
         $taskData = Invoke-RestMethod -Uri $uri @script:XoRestParameters -Body $Params
-        
+
         if ($taskData) {
             return ConvertTo-XoTaskObject -InputObject $taskData
         }
-    } catch {
+    }
+    catch {
         throw ("Failed to retrieve task with ID {0}: {1}" -f $TaskId, $_)
     }
     return $null
@@ -156,7 +163,7 @@ function Get-XoTask {
         [Parameter(ParameterSetName = "Filter")]
         [ValidateSet("pending", "success", "failure")]
         [string]$Status,
-        
+
         [Parameter(ParameterSetName = "Filter")]
         [int]$Limit = $script:XoSessionLimit
     )
@@ -165,7 +172,7 @@ function Get-XoTask {
         if (-not $script:XoHost -or -not $script:XoRestParameters) {
             throw ("Not connected to Xen Orchestra. Call Connect-XoSession first.")
         }
-        
+
         $params = @{
             fields = $script:XO_TASK_FIELDS
         }
@@ -181,7 +188,7 @@ function Get-XoTask {
             }
         }
     }
-    
+
     process {
         if ($PSCmdlet.ParameterSetName -eq "TaskId") {
             foreach ($id in $TaskId) {
@@ -189,28 +196,30 @@ function Get-XoTask {
             }
         }
     }
-    
+
     end {
         if ($PSCmdlet.ParameterSetName -eq "Filter") {
             try {
                 Write-Verbose "Getting tasks with parameters: $($params | ConvertTo-Json -Compress)"
                 $uri = "$script:XoHost/rest/v0/tasks"
                 $tasksResponse = Invoke-RestMethod -Uri $uri @script:XoRestParameters -Body $params
-                
+
                 if ($null -eq $tasksResponse -or $tasksResponse.Count -eq 0) {
                     Write-Verbose "No tasks found matching criteria"
                     return
                 }
-                
+
                 Write-Verbose "Found $($tasksResponse.Count) tasks"
-                
+
                 foreach ($taskItem in $tasksResponse) {
                     ConvertTo-XoTaskObject -InputObject $taskItem
                 }
-            } catch {
+            }
+            catch {
                 if ($PSBoundParameters.ContainsKey('Status')) {
                     throw ("Failed to retrieve tasks with status {0}: {1}" -f $Status, $_)
-                } else {
+                }
+                else {
                     throw ("Failed to retrieve tasks: {0}" -f $_)
                 }
             }
@@ -242,7 +251,7 @@ function Wait-XoTask {
         [Parameter(Mandatory, ValueFromPipelineByPropertyName, Position = 0)]
         [ValidateNotNullOrEmpty()]
         [string[]]$TaskId,
-        
+
         [Parameter()]
         [switch]$PassThru
     )
@@ -264,7 +273,7 @@ function Wait-XoTask {
             try {
                 $uri = "$script:XoHost/rest/v0/tasks/$id"
                 $result = Invoke-RestMethod -Uri $uri @script:XoRestParameters -Body $params
-                
+
                 if ($PassThru -and $result) {
                     ConvertTo-XoTaskObject -InputObject $result
                 }

@@ -21,15 +21,15 @@ function ConvertTo-XoVdiObject {
 
     process {
         $props = @{
-            PSTypeName = "XoPowershell.Vdi"
-            VdiUuid = $InputObject.uuid
-            Name = $InputObject.name_label
-            ContentType = $InputObject.content_type
-            Size = $InputObject.size
-            Usage = $InputObject.usage
+            PSTypeName    = "XoPowershell.Vdi"
+            VdiUuid       = $InputObject.uuid
+            Name          = $InputObject.name_label
+            ContentType   = $InputObject.content_type
+            Size          = $InputObject.size
+            Usage         = $InputObject.usage
             PhysicalUsage = $InputObject.physical_usage
-            SrUuid = $InputObject.sr_uuid
-            SrUsage = $InputObject.sr_usage
+            SrUuid        = $InputObject.sr_uuid
+            SrUsage       = $InputObject.sr_usage
         }
 
         [PSCustomObject]$props
@@ -41,16 +41,17 @@ function Get-XoSingleVdiById {
         [string]$VdiUuid,
         [hashtable]$Params
     )
-    
+
     try {
         Write-Verbose "Getting VDI with UUID $VdiUuid"
         $uri = "$script:XoHost/rest/v0/vdis/$VdiUuid"
         $vdiData = Invoke-RestMethod -Uri $uri @script:XoRestParameters -Body $Params
-        
+
         if ($vdiData) {
             return ConvertTo-XoVdiObject -InputObject $vdiData
         }
-    } catch {
+    }
+    catch {
         throw ("Failed to retrieve VDI with UUID {0}: {1}" -f $VdiUuid, $_)
     }
     return $null
@@ -92,13 +93,13 @@ function Get-XoVdi {
         [Parameter(Mandatory, ValueFromPipelineByPropertyName, Position = 0, ParameterSetName = "VdiUuid")]
         [Alias("VdiId")]
         [string[]]$VdiUuid,
-        
+
         [Parameter(ParameterSetName = "Filter")]
         [string]$SrUuid,
 
         [Parameter(ParameterSetName = "Filter")]
         [string]$Filter,
-        
+
         [Parameter(ParameterSetName = "Filter")]
         [int]$Limit = $script:XoSessionLimit
     )
@@ -107,23 +108,23 @@ function Get-XoVdi {
         if (-not $script:XoHost -or -not $script:XoRestParameters) {
             throw ("Not connected to Xen Orchestra. Call Connect-XoSession first.")
         }
-        
+
         $params = @{ fields = $script:XO_VDI_FIELDS }
-        
+
         $filterParts = @()
-        
+
         if ($SrUuid) {
             $filterParts += "sr_uuid:$SrUuid"
         }
-        
+
         if ($Filter) {
             $filterParts += $Filter
         }
-        
+
         if ($filterParts.Count -gt 0) {
             $params['filter'] = $filterParts -join " "
         }
-        
+
         if ($Limit -ne 0) {
             $params['limit'] = $Limit
             if (!$PSBoundParameters.ContainsKey('Limit')) {
@@ -131,7 +132,7 @@ function Get-XoVdi {
             }
         }
     }
-    
+
     process {
         if ($PSCmdlet.ParameterSetName -eq "VdiUuid") {
             foreach ($id in $VdiUuid) {
@@ -139,25 +140,26 @@ function Get-XoVdi {
             }
         }
     }
-    
+
     end {
         if ($PSCmdlet.ParameterSetName -eq "Filter") {
             try {
                 Write-Verbose "Getting VDIs with parameters: $($params | ConvertTo-Json -Compress)"
                 $uri = "$script:XoHost/rest/v0/vdis"
                 $response = Invoke-RestMethod -Uri $uri @script:XoRestParameters -Body $params
-                
+
                 if (!$response -or $response.Count -eq 0) {
                     Write-Verbose "No VDIs found matching criteria"
                     return
                 }
-                
+
                 Write-Verbose "Found $($response.Count) VDIs"
-                
+
                 foreach ($vdiItem in $response) {
                     ConvertTo-XoVdiObject -InputObject $vdiItem
                 }
-            } catch {
+            }
+            catch {
                 throw ("Failed to list VDIs. Error: {0}" -f $_)
             }
         }
@@ -191,15 +193,15 @@ function Export-XoVdi {
         [ValidateNotNullOrEmpty()]
         [Alias("VdiId")]
         [string]$VdiUuid,
-        
+
         [Parameter(Mandatory)]
         [ValidateSet("raw", "vhd")]
         [string]$Format,
-        
+
         [Parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
         [string]$OutFile,
-        
+
         [Parameter()]
         [switch]$PassThru
     )
@@ -209,13 +211,14 @@ function Export-XoVdi {
             try {
                 $uri = "$script:XoHost/rest/v0/vdis/$VdiUuid/export"
                 $params = @{ format = $Format }
-                
+
                 Invoke-RestMethod -Uri $uri @script:XoRestParameters -Body $params -OutFile $OutFile
-                
+
                 if ($PassThru) {
                     Get-Item $OutFile
                 }
-            } catch {
+            }
+            catch {
                 throw ("Failed to export VDI with UUID {0}: {1}" -f $VdiUuid, $_)
             }
         }
