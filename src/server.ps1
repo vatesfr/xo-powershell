@@ -20,19 +20,19 @@ function ConvertTo-XoServerObject {
 
     process {
         $props = @{
-            ServerUuid = $InputObject.id  # API returns 'id' field, not 'uuid' for servers
-            Name       = $InputObject.label
-            NameHost   = $InputObject.host
-            Address    = $InputObject.address
-            Status     = $InputObject.status
-            Version    = $InputObject.version
-            Enabled    = $InputObject.enabled
-            ReadOnly   = $InputObject.readOnly
-            Username   = $InputObject.username
-            Error      = $InputObject.error
+            ServerUuid        = $InputObject.id  # API returns 'id' field, not 'uuid' for servers
+            Name              = $InputObject.label
+            NameHost          = $InputObject.host
+            Address           = $InputObject.address
+            Status            = $InputObject.status
+            Version           = $InputObject.version
+            Enabled           = $InputObject.enabled
+            ReadOnly          = $InputObject.readOnly
+            Username          = $InputObject.username
+            Error             = $InputObject.error
             AllowUnauthorized = $InputObject.allowUnauthorized
         }
-        
+
         Set-XoObject $InputObject -TypeName XoPowershell.Server -Properties $props
     }
 }
@@ -42,7 +42,7 @@ function Get-XoSingleServerById {
         [string]$ServerUuid,
         [hashtable]$Params
     )
-    
+
     try {
         Write-Verbose "Getting server with ID $ServerUuid"
         $uri = "$script:XoHost/rest/v0/servers/$ServerUuid"
@@ -53,13 +53,14 @@ function Get-XoSingleServerById {
         if (-not $Params.ContainsKey('fields')) {
             $Params['fields'] = $script:XO_SERVER_FIELDS
         }
-        
+
         $serverData = Invoke-RestMethod -Uri $uri @script:XoRestParameters -Body $Params
-        
+
         if ($serverData) {
             return ConvertTo-XoServerObject -InputObject $serverData
         }
-    } catch {
+    }
+    catch {
         throw ("Failed to retrieve server with ID {0}: {1}" -f $ServerUuid, $_)
     }
     return $null
@@ -111,13 +112,13 @@ function Get-XoServer {
         if (-not $script:XoHost -or -not $script:XoRestParameters) {
             throw ("Not connected to Xen Orchestra. Call Connect-XoSession first.")
         }
-        
+
         $params = @{ fields = $script:XO_SERVER_FIELDS }
-        
+
         if ($PSCmdlet.ParameterSetName -eq "Filter" -and $Filter) {
             $params['filter'] = $Filter
         }
-        
+
         if ($Limit -ne 0 -and $PSCmdlet.ParameterSetName -eq "Filter") {
             $params['limit'] = $Limit
             if (!$PSBoundParameters.ContainsKey('Limit')) {
@@ -125,7 +126,7 @@ function Get-XoServer {
             }
         }
     }
-    
+
     process {
         if ($PSCmdlet.ParameterSetName -eq "ServerUuid") {
             foreach ($id in $ServerUuid) {
@@ -133,25 +134,26 @@ function Get-XoServer {
             }
         }
     }
-    
+
     end {
         if ($PSCmdlet.ParameterSetName -eq "Filter") {
             try {
                 Write-Verbose "Getting servers with parameters: $($params | ConvertTo-Json -Compress)"
                 $uri = "$script:XoHost/rest/v0/servers"
                 $response = Invoke-RestMethod -Uri $uri @script:XoRestParameters -Body $params
-                
+
                 if (!$response -or $response.Count -eq 0) {
                     Write-Verbose "No servers found matching criteria"
                     return
                 }
-                
+
                 Write-Verbose "Found $($response.Count) servers"
-                
+
                 foreach ($serverItem in $response) {
                     ConvertTo-XoServerObject -InputObject $serverItem
                 }
-            } catch {
+            }
+            catch {
                 throw ("Failed to list servers. Error: {0}" -f $_)
             }
         }

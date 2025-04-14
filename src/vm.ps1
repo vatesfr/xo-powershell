@@ -20,21 +20,21 @@ function ConvertTo-XoVmObject {
 
     process {
         $vmObj = [PSCustomObject]@{
-            PSTypeName     = "XoPowershell.Vm"
-            VmUuid         = $InputObject.uuid
-            Name           = $InputObject.name_label
-            Description    = $InputObject.name_description
-            PowerState     = $InputObject.power_state
-            MainIpAddress  = $InputObject.mainIpAddress
-            OsVersion      = $InputObject.os_version
-            VIFs           = $InputObject.VIFs
-            VBDs           = $InputObject.$VBDs
-            Parent         = $InputObject.parent
-            Snapshots      = $InputObject.snapshots
-            HostUuid       = $InputObject.$container
-            XenstoreData   = $InputObject.xenStoreData
-            Tags           = $InputObject.tags
-            Memory         = $InputObject.memory
+            PSTypeName    = "XoPowershell.Vm"
+            VmUuid        = $InputObject.uuid
+            Name          = $InputObject.name_label
+            Description   = $InputObject.name_description
+            PowerState    = $InputObject.power_state
+            MainIpAddress = $InputObject.mainIpAddress
+            OsVersion     = $InputObject.os_version
+            VIFs          = $InputObject.VIFs
+            VBDs          = $InputObject.$VBDs
+            Parent        = $InputObject.parent
+            Snapshots     = $InputObject.snapshots
+            HostUuid      = $InputObject.$container
+            XenstoreData  = $InputObject.xenStoreData
+            Tags          = $InputObject.tags
+            Memory        = $InputObject.memory
         }
 
         if ($null -ne $InputObject.CPUs) {
@@ -54,16 +54,17 @@ function Get-XoSingleVmById {
     param (
         [string]$VmUuid
     )
-    
+
     try {
         $uri = "$script:XoHost/rest/v0/vms/$VmUuid"
         $params = @{ fields = $script:XO_VM_FIELDS }
         $vmData = Invoke-RestMethod -Uri $uri @script:XoRestParameters -Body $params
-        
+
         if ($vmData) {
             return ConvertTo-XoVmObject -InputObject $vmData
         }
-    } catch {
+    }
+    catch {
         throw ("Failed to retrieve VM with UUID {0}: {1}" -f $VmUuid, $_)
     }
     return $null
@@ -110,17 +111,17 @@ function Get-XoVm {
         [Parameter(Mandatory, ValueFromPipelineByPropertyName, Position = 0, ParameterSetName = "VmUuid")]
         [Alias("VmId")]
         [string[]]$VmUuid,
-        
+
         [Parameter(ParameterSetName = "Filter")]
         [ValidateSet("Running", "Halted", "Suspended")]
         [string[]]$PowerState,
-        
+
         [Parameter(ParameterSetName = "Filter")]
         [string[]]$Tag,
-        
+
         [Parameter(ParameterSetName = "Filter")]
         [string]$Filter,
-        
+
         [Parameter(ParameterSetName = "Filter")]
         [int]$Limit = $script:XoSessionLimit
     )
@@ -129,11 +130,11 @@ function Get-XoVm {
         if (-not $script:XoHost -or -not $script:XoRestParameters) {
             throw ("Not connected to Xen Orchestra. Call Connect-XoSession first.")
         }
-        
+
         $params = @{ fields = $script:XO_VM_FIELDS }
-        
+
         $filterParts = @()
-        
+
         if ($PowerState) {
             $filterParts += "power_state:($($PowerState -join '|'))"
         }
@@ -145,7 +146,7 @@ function Get-XoVm {
         if ($Filter) {
             $filterParts += $Filter
         }
-        
+
         if ($filterParts.Count -gt 0) {
             $params['filter'] = $filterParts -join " "
         }
@@ -157,7 +158,7 @@ function Get-XoVm {
             }
         }
     }
-    
+
     process {
         if ($PSCmdlet.ParameterSetName -eq "VmUuid") {
             foreach ($id in $VmUuid) {
@@ -165,20 +166,20 @@ function Get-XoVm {
             }
         }
     }
-    
+
     end {
         if ($PSCmdlet.ParameterSetName -eq "Filter") {
             try {
                 $uri = "$script:XoHost/rest/v0/vms"
                 Write-Verbose "Getting VMs from $uri with parameters: $($params | ConvertTo-Json -Compress)"
-                
+
                 $response = Invoke-RestMethod -Uri $uri @script:XoRestParameters -Body $params
-                
+
                 if (!$response -or $response.Count -eq 0) {
                     Write-Verbose "No VMs found matching criteria"
                     return
                 }
-                
+
                 Write-Verbose "Found $($response.Count) VMs"
 
                 foreach ($vmItem in $response) {
@@ -501,7 +502,7 @@ function Get-XoVmSnapshot {
         [ValidateNotNullOrEmpty()]
         [Alias("SnapshotId", "SnapshotUuid")]
         [string[]]$VmSnapshotUuid,
-        
+
         [Parameter(ParameterSetName = "Filter")]
         [string]$Filter,
 
@@ -513,7 +514,7 @@ function Get-XoVmSnapshot {
         if (-not $script:XoHost -or -not $script:XoRestParameters) {
             throw ("Not connected to Xen Orchestra. Call Connect-XoSession first.")
         }
-        
+
         $fields = "uuid,name_label,name_description,snapshot_time,snapshot_of,power_state,tags,CPUs,memory"
         $params = @{ fields = $fields }
 
@@ -528,7 +529,7 @@ function Get-XoVmSnapshot {
             }
         }
     }
-    
+
     process {
         if ($PSCmdlet.ParameterSetName -eq "VmSnapshotUuid") {
             foreach ($id in $VmSnapshotUuid) {
@@ -543,22 +544,22 @@ function Get-XoVmSnapshot {
             }
         }
     }
-    
+
     end {
         if ($PSCmdlet.ParameterSetName -eq "Filter") {
             try {
                 $uri = "$script:XoHost/rest/v0/vm-snapshots"
                 Write-Verbose "Getting VM snapshots from $uri with parameters: $($params | ConvertTo-Json -Compress)"
-                
+
                 $snapshotsResponse = Invoke-RestMethod -Uri $uri @script:XoRestParameters -Body $params
-                
+
                 if (!$snapshotsResponse -or $snapshotsResponse.Count -eq 0) {
                     Write-Verbose "No VM snapshots found matching criteria"
                     return
                 }
-                
+
                 Write-Verbose "Found $($snapshotsResponse.Count) VM snapshots"
-                
+
                 foreach ($snapshotItem in $snapshotsResponse) {
                     ConvertTo-XoVmSnapshotObject $snapshotItem
                 }

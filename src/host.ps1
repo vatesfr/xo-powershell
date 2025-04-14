@@ -47,10 +47,11 @@ function ConvertTo-XoHostObject {
 
     if ($InputObject.CPUs -and $InputObject.CPUs.cpu_count) {
         $hostObj | Add-Member -NotePropertyName "VCpus" -NotePropertyValue $InputObject.CPUs.cpu_count
-    } elseif ($InputObject.cpus -and $InputObject.cpus.cores) {
+    }
+    elseif ($InputObject.cpus -and $InputObject.cpus.cores) {
         $hostObj | Add-Member -NotePropertyName "VCpus" -NotePropertyValue $InputObject.cpus.cores
     }
-    
+
     return $hostObj
 }
 
@@ -59,16 +60,17 @@ function Get-XoSingleHostById {
         [string]$HostUuid,
         [hashtable]$Params
     )
-    
+
     try {
         $uri = "$script:XoHost/rest/v0/hosts/$HostUuid"
         $params = @{ fields = $script:XO_HOST_FIELDS }
         $hostData = Invoke-RestMethod -Uri $uri @script:XoRestParameters -Body $params
-        
+
         if ($hostData) {
             return ConvertTo-XoHostObject -InputObject $hostData
         }
-    } catch {
+    }
+    catch {
         throw ("Failed to retrieve host with UUID {0}: {1}" -f $HostUuid, $_)
     }
     return $null
@@ -79,7 +81,7 @@ function Get-XoHost {
     .SYNOPSIS
         Get physical hosts from Xen Orchestra.
     .DESCRIPTION
-        Retrieves physical XCP-ng/XenServer hosts from Xen Orchestra. 
+        Retrieves physical XCP-ng/XenServer hosts from Xen Orchestra.
         Can retrieve specific hosts by their UUID or filter hosts by various criteria.
     .PARAMETER HostUuid
         The UUID(s) of the host(s) to retrieve.
@@ -109,10 +111,10 @@ function Get-XoHost {
         [ValidatePattern("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")]
         [Alias("HostId")]
         [string[]]$HostUuid,
-        
+
         [Parameter(ParameterSetName = "Filter")]
         [string]$Filter,
-        
+
         [Parameter(ParameterSetName = "Filter")]
         [int]$Limit = $script:XoSessionLimit
     )
@@ -121,13 +123,13 @@ function Get-XoHost {
         if (-not $script:XoHost -or -not $script:XoRestParameters) {
             throw ("Not connected to Xen Orchestra. Call Connect-XoSession first.")
         }
-        
+
         $params = @{ fields = $script:XO_HOST_FIELDS }
-        
+
         if ($PSCmdlet.ParameterSetName -eq "Filter" -and $Filter) {
             $params['filter'] = $Filter
         }
-        
+
         if ($Limit -ne 0 -and $PSCmdlet.ParameterSetName -eq "Filter") {
             $params['limit'] = $Limit
             if (!$PSBoundParameters.ContainsKey('Limit')) {
@@ -135,7 +137,7 @@ function Get-XoHost {
             }
         }
     }
-    
+
     process {
         if ($PSCmdlet.ParameterSetName -eq "HostUuid") {
             foreach ($id in $HostUuid) {
@@ -143,13 +145,13 @@ function Get-XoHost {
             }
         }
     }
-    
+
     end {
         if ($PSCmdlet.ParameterSetName -eq "Filter") {
             try {
                 $uri = "$script:XoHost/rest/v0/hosts"
                 $hostsResponse = Invoke-RestMethod -Uri $uri @script:XoRestParameters -Body $params
-                
+
                 if (!$hostsResponse -or $hostsResponse.Count -eq 0) {
                     Write-Verbose "No hosts found"
                     return
@@ -158,7 +160,8 @@ function Get-XoHost {
                 foreach ($hostItem in $hostsResponse) {
                     ConvertTo-XoHostObject -InputObject $hostItem
                 }
-            } catch {
+            }
+            catch {
                 throw ("Failed to list hosts. Error: {0}" -f $_)
             }
         }
