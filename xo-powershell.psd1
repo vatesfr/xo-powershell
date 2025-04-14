@@ -80,6 +80,9 @@
         # vif
         "Get-XoVif"
         "Set-XoVif"
+
+        # vbd
+        "Get-XoVbd"
     )
     AliasesToExport   = @(
         "Connect-XenOrchestra"
@@ -101,5 +104,6 @@
         "formats/network.ps1xml"
         "formats/pif.ps1xml"
         "formats/vif.ps1xml"
+        "formats/vbd.ps1xml"
     )
 }
