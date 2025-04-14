@@ -69,9 +69,8 @@ function Get-XoPool {
                 $AllFilters = "$AllFilters tags:($tags)"
             }
 
-            $params = Remove-XoEmptyValues @{
-                filter = $AllFilters
-                fields = $script:XO_POOL_FIELDS
+            if ($AllFilters) {
+                $params["filter"] = $AllFilters
             }
         }
 

@@ -64,9 +64,8 @@ function Get-XoMessage {
                 $AllFilters = "$AllFilters name:`"$Name`""
             }
 
-            $params = Remove-XoEmptyValues @{
-                filter = $AllFilters
-                fields = $script:XO_MESSAGE_FIELDS
+            if ($AllFilters) {
+                $params["filter"] = $AllFilters
             }
         }
 
