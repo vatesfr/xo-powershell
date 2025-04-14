@@ -31,7 +31,6 @@ function ConvertTo-XoVmObject {
             VBDs           = $InputObject.$VBDs
             Parent         = $InputObject.parent
             Snapshots      = $InputObject.snapshots
-            VmSnapshotUuid = $InputObject.snapshots
             HostUuid       = $InputObject.$container
             XenstoreData   = $InputObject.xenStoreData
             Tags           = $InputObject.tags
