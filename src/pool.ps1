@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 $script:XO_POOL_FIELDS = "auto_poweron,default_SR,HA_enabled,haSrs,master,tags,name_description,name_label,migrationCompression,cpus,zstdSupported,vtpmSupported,platform_version,type,uuid"
 
 function ConvertTo-XoPoolObject {
