@@ -170,35 +170,44 @@ function Disconnect-XoSession {
 }
 New-Alias -Name Disconnect-XenOrchestra -Value Disconnect-XoSession
 
-function Set-XoDefaultLimit {
+function Get-XoSession {
     <#
     .SYNOPSIS
-        Set the default limit for XO query cmdlets.
+        Get the current XO session settings.
     .DESCRIPTION
-        Sets the default limit for all Get-Xo* cmdlets that support a -Limit parameter.
-        This setting persists for the current PowerShell session.
+        Get the current XO session settings.
+    #>
+    [CmdletBinding()]
+    param()
+
+    [pscustomobject]@{
+        Limit = $script:XoSessionLimit
+    }
+}
+
+function Set-XoSession {
+    <#
+    .SYNOPSIS
+        Set the current XO session settings.
+    .DESCRIPTION
+        Set the current XO session settings.
     .PARAMETER Limit
-        The default limit to use. Set to 0 for unlimited results.
+        Sets the current XO query limit for all Get-Xo* cmdlets that support a -Limit parameter.
     .EXAMPLE
-        Set-XoDefaultLimit -Limit 50
-        Sets the default limit to 50 items for all query cmdlets.
+        Set-XoSession -Limit 50
+        Sets the current session-wide limit to 50 items for all query cmdlets.
     .EXAMPLE
-        Set-XoDefaultLimit -Limit 0
+        Set-XoSession -Limit 0
         Sets cmdlets to return all items by default.
     #>
     [CmdletBinding()]
     param(
-        [Parameter(Mandatory)]
+        [Parameter()]
         [int]$Limit
     )
 
-    $oldLimit = $script:XoSessionLimit
-    
-    $script:XoSessionLimit = $Limit
-    
-    if ($Limit -eq 0) {
-        Write-Verbose "Default limit for XO queries changed from $oldLimit to unlimited (0)"
-    } else {
-        Write-Verbose "Default limit for XO queries changed from $oldLimit to $Limit"
+    if ($PSBoundParameters.ContainsKey("Limit")) {
+        Write-Verbose "Default limit for XO queries changed from $script:XoSessionLimit to $Limit"
+        $script:XoSessionLimit = $Limit
     }
 }
