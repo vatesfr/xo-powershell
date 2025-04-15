@@ -15,44 +15,22 @@ function ConvertTo-XoHostObject {
     [CmdletBinding()]
     [OutputType("XoPowershell.Host")]
     param (
-        [Parameter(Mandatory, Position = 0)]
-        $InputObject
+        [Parameter(Mandatory, ValueFromPipeline, Position = 0)]$InputObject
     )
 
-    $hostObj = [PSCustomObject]@{
-        PSTypeName    = "XoPowershell.Host"
-        HostUuid      = $InputObject.uuid
-        Name          = $InputObject.name_label
-        Address       = $InputObject.address
-        PowerState    = $InputObject.power_state
-        Description   = $InputObject.name_description
-        StartTime     = $InputObject.startTime
-        Tags          = $InputObject.tags
-        Version       = $InputObject.version
-        ProductBrand  = $InputObject.productBrand
-        BiosStrings   = $InputObject.bios_strings
-        Build         = $InputObject.build
-        Hostname      = $InputObject.hostname
-        LicenseParams = $InputObject.license_params
-        LicenseServer = $InputObject.license_server
-        LicenseExpiry = $InputObject.license_expiry
-        ResidentVms   = $InputObject.residentVms
-        Pifs          = $InputObject.PIFs
-        PcIs          = $InputObject.PCIs
-        PGpus         = $InputObject.PGPUs
-        PoolId        = $InputObject.poolId
-        Memory        = $InputObject.memory
-        CPUs          = $InputObject.CPUs
+    process {
+        $props = @{
+            HostUuid      = $InputObject.uuid
+            Name          = $InputObject.name_label
+            PowerState    = $InputObject.power_state
+            Description   = $InputObject.name_description
+            BiosStrings   = $InputObject.bios_strings
+            LicenseParams = $InputObject.license_params
+            LicenseServer = $InputObject.license_server
+            LicenseExpiry = $InputObject.license_expiry
+        }
+        Set-XoObject $InputObject -TypeName XoPowershell.Host -Properties $props
     }
-
-    if ($InputObject.CPUs -and $InputObject.CPUs.cpu_count) {
-        $hostObj | Add-Member -NotePropertyName "VCpus" -NotePropertyValue $InputObject.CPUs.cpu_count
-    }
-    elseif ($InputObject.cpus -and $InputObject.cpus.cores) {
-        $hostObj | Add-Member -NotePropertyName "VCpus" -NotePropertyValue $InputObject.cpus.cores
-    }
-
-    return $hostObj
 }
 
 function Get-XoSingleHostById {
@@ -73,7 +51,6 @@ function Get-XoSingleHostById {
     catch {
         throw ("Failed to retrieve host with UUID {0}: {1}" -f $HostUuid, $_)
     }
-    return $null
 }
 
 function Get-XoHost {
@@ -115,9 +92,15 @@ function Get-XoHost {
         [Parameter(ParameterSetName = "Filter")]
         [string]$Filter,
 
+        [Parameter(ValueFromPipelineByPropertyName, ParameterSetName = "Filter")]
+        [ValidatePattern("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")]
+        [string]$PoolUuid,
+
         [Parameter(ParameterSetName = "Filter")]
         [int]$Limit = $script:XoSessionLimit
     )
+
+    # use Invoke-XoRestMethod with JSON hashtable fallback in this cmdlet since server may send JSON object with multiple "cpus" keys, which confuses PowerShell when outputting PSObjects
 
     begin {
         if (-not $script:XoHost -or -not $script:XoRestParameters) {
@@ -126,22 +109,28 @@ function Get-XoHost {
 
         $params = @{ fields = $script:XO_HOST_FIELDS }
 
-        if ($PSCmdlet.ParameterSetName -eq "Filter" -and $Filter) {
-            $params['filter'] = $Filter
+        if ($PSCmdlet.ParameterSetName -eq "Filter") {
+            $AllFilters = $Filter
+
+            if ($PoolUuid) {
+                $AllFilters = "$AllFilters `$pool:$PoolUuid"
+            }
+
+            if ($AllFilters) {
+                Write-Verbose "Filter: $AllFilters"
+                $params["filter"] = $AllFilters
+            }
         }
 
-        if ($Limit -ne 0 -and $PSCmdlet.ParameterSetName -eq "Filter") {
-            $params['limit'] = $Limit
-            if (!$PSBoundParameters.ContainsKey('Limit')) {
-                Write-Warning "No limit specified. Using default limit of $Limit. Use -Limit 0 for unlimited results."
-            }
+        if ($Limit) {
+            $params["limit"] = $Limit
         }
     }
 
     process {
         if ($PSCmdlet.ParameterSetName -eq "HostUuid") {
             foreach ($id in $HostUuid) {
-                Get-XoSingleHostById -HostUuid $id -Params $params
+                ConvertTo-XoHostObject (Invoke-XoRestMethod -Uri "$script:XoHost/rest/v0/hosts/$id" -Body $params)
             }
         }
     }
@@ -150,7 +139,7 @@ function Get-XoHost {
         if ($PSCmdlet.ParameterSetName -eq "Filter") {
             try {
                 $uri = "$script:XoHost/rest/v0/hosts"
-                $hostsResponse = Invoke-RestMethod -Uri $uri @script:XoRestParameters -Body $params
+                $hostsResponse = Invoke-XoRestMethod -Uri $uri -Body $params
 
                 if (!$hostsResponse -or $hostsResponse.Count -eq 0) {
                     Write-Verbose "No hosts found"
