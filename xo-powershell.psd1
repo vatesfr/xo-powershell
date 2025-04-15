@@ -66,6 +66,9 @@
         "Stop-XoPool"
         "Update-XoPool"
 
+        # pool-patch
+        "Get-XoPoolPatch"
+
         # message
         "Get-XoMessage"
 
@@ -100,6 +103,7 @@
         "formats/server.ps1xml"
         "formats/host.ps1xml"
         "formats/pool.ps1xml"
+        "formats/pool-patch.ps1xml"
         "formats/message.ps1xml"
         "formats/network.ps1xml"
         "formats/pif.ps1xml"
