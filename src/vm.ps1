@@ -101,6 +101,7 @@ function Get-XoVm {
     [CmdletBinding(DefaultParameterSetName = "Filter")]
     param(
         [Parameter(Mandatory, ValueFromPipelineByPropertyName, Position = 0, ParameterSetName = "VmUuid")]
+        [ValidatePattern("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")]
         [Alias("VmId")]
         [string[]]$VmUuid,
 
@@ -114,6 +115,14 @@ function Get-XoVm {
         [Parameter(ParameterSetName = "Filter")]
         [string]$Filter,
 
+        [Parameter(ValueFromPipelineByPropertyName, ParameterSetName = "Filter")]
+        [ValidatePattern("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")]
+        [string]$PoolUuid,
+
+        [Parameter(ValueFromPipelineByPropertyName, ParameterSetName = "Filter")]
+        [ValidatePattern("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")]
+        [string]$HostUuid,
+
         [Parameter(ParameterSetName = "Filter")]
         [int]$Limit = $script:XoSessionLimit
     )
@@ -125,29 +134,33 @@ function Get-XoVm {
 
         $params = @{ fields = $script:XO_VM_FIELDS }
 
-        $filterParts = @()
+        if ($PSCmdlet.ParameterSetName -eq "Filter") {
+            $AllFilters = $Filter
 
-        if ($PowerState) {
-            $filterParts += "power_state:($($PowerState -join '|'))"
-        }
-
-        if ($Tag) {
-            $filterParts += "tags:($($Tag -join '&'))"
-        }
-
-        if ($Filter) {
-            $filterParts += $Filter
-        }
-
-        if ($filterParts.Count -gt 0) {
-            $params['filter'] = $filterParts -join " "
-        }
-
-        if ($Limit -ne 0) {
-            $params['limit'] = $Limit
-            if (!$PSBoundParameters.ContainsKey('Limit')) {
-                Write-Warning "No limit specified. Using default limit of $Limit. Use -Limit 0 for unlimited results."
+            if ($PowerState) {
+                $AllFilters = "$AllFilters power_state:($($PowerState -join '|'))"
             }
+
+            if ($Tag) {
+                $AllFilters = "$AllFilters tags:($($Tag -join '&'))"
+            }
+
+            if ($PoolUuid) {
+                $AllFilters = "$AllFilters `$pool:$PoolUuid"
+            }
+
+            if ($HostUuid) {
+                $AllFilters = "$AllFilters `$container:$HostUuid"
+            }
+
+            if ($AllFilters) {
+                Write-Verbose "Filter: $AllFilters"
+                $params["filter"] = $AllFilters
+            }
+        }
+
+        if ($Limit) {
+            $params['limit'] = $Limit
         }
     }
 
