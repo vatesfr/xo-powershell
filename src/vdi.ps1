@@ -110,27 +110,6 @@ function Get-XoVdi {
         }
 
         $params = @{ fields = $script:XO_VDI_FIELDS }
-
-        $filterParts = @()
-
-        if ($SrUuid) {
-            $filterParts += "sr_uuid:$SrUuid"
-        }
-
-        if ($Filter) {
-            $filterParts += $Filter
-        }
-
-        if ($filterParts.Count -gt 0) {
-            $params['filter'] = $filterParts -join " "
-        }
-
-        if ($Limit -ne 0) {
-            $params['limit'] = $Limit
-            if (!$PSBoundParameters.ContainsKey('Limit')) {
-                Write-Warning "No limit specified. Using default limit of $Limit. Use -Limit 0 for unlimited results."
-            }
-        }
     }
 
     process {
@@ -143,6 +122,24 @@ function Get-XoVdi {
 
     end {
         if ($PSCmdlet.ParameterSetName -eq "Filter") {
+            $filterParts = @()
+
+            if ($SrUuid) {
+                $filterParts += "sr_uuid:$SrUuid"
+            }
+
+            if ($Filter) {
+                $filterParts += $Filter
+            }
+
+            if ($filterParts.Count -gt 0) {
+                $params['filter'] = $filterParts -join " "
+            }
+
+            if ($Limit) {
+                $params['limit'] = $Limit
+            }
+
             try {
                 Write-Verbose "Getting VDIs with parameters: $($params | ConvertTo-Json -Compress)"
                 $uri = "$script:XoHost/rest/v0/vdis"

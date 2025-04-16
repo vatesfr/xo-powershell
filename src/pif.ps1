@@ -55,24 +55,6 @@ function Get-XoPif {
             fields = $script:XO_PIF_FIELDS
         }
 
-        if ($PSCmdlet.ParameterSetName -eq "Filter") {
-            $AllFilters = $Filter
-
-            if ($Name) {
-                $AllFilters = "$AllFilters name_label:`"$Name`""
-            }
-
-            if ($Tag) {
-                $tags = ($tag | ForEach-Object { "`"$_`"" }) -join " "
-                $AllFilters = "$AllFilters tags:($tags)"
-            }
-
-            $params = Remove-XoEmptyValues @{
-                filter = $AllFilters
-                fields = $script:XO_PIF_FIELDS
-            }
-        }
-
         if ($Limit) {
             $params["limit"] = $Limit
         }
@@ -88,6 +70,21 @@ function Get-XoPif {
 
     end {
         if ($PSCmdlet.ParameterSetName -eq "Filter") {
+            $AllFilters = $Filter
+
+            if ($Name) {
+                $AllFilters = "$AllFilters name_label:`"$Name`""
+            }
+
+            if ($Tag) {
+                $tags = ($tag | ForEach-Object { "`"$_`"" }) -join " "
+                $AllFilters = "$AllFilters tags:($tags)"
+            }
+
+            if ($AllFilters) {
+                $params["filter"] = $AllFilters
+            }
+
             (Invoke-RestMethod -Uri "$script:XoHost/rest/v0/pifs" @script:XoRestParameters -Body $params) | ConvertTo-XoPifObject
         }
     }

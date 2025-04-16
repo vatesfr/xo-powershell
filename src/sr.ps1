@@ -100,13 +100,6 @@ function Get-XoSr {
         $params = @{
             fields = $script:XO_SR_FIELDS
         }
-
-        if ($Limit -ne 0 -and $PSCmdlet.ParameterSetName -eq "Filter") {
-            $params['limit'] = $Limit
-            if (!$PSBoundParameters.ContainsKey('Limit')) {
-                Write-Warning "No limit specified. Using default limit of $Limit. Use -Limit 0 for unlimited results."
-            }
-        }
     }
 
     process {
@@ -119,6 +112,10 @@ function Get-XoSr {
 
     end {
         if ($PSCmdlet.ParameterSetName -eq "Filter") {
+            if ($Limit) {
+                $params['limit'] = $Limit
+            }
+
             try {
                 Write-Verbose "Getting SRs with parameters: $($params | ConvertTo-Json -Compress)"
                 $uri = "$script:XoHost/rest/v0/srs"

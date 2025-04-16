@@ -133,7 +133,17 @@ function Get-XoVm {
         }
 
         $params = @{ fields = $script:XO_VM_FIELDS }
+    }
 
+    process {
+        if ($PSCmdlet.ParameterSetName -eq "VmUuid") {
+            foreach ($id in $VmUuid) {
+                Get-XoSingleVmById -VmUuid $id
+            }
+        }
+    }
+
+    end {
         if ($PSCmdlet.ParameterSetName -eq "Filter") {
             $AllFilters = $Filter
 
@@ -157,23 +167,11 @@ function Get-XoVm {
                 Write-Verbose "Filter: $AllFilters"
                 $params["filter"] = $AllFilters
             }
-        }
 
-        if ($Limit) {
-            $params['limit'] = $Limit
-        }
-    }
-
-    process {
-        if ($PSCmdlet.ParameterSetName -eq "VmUuid") {
-            foreach ($id in $VmUuid) {
-                Get-XoSingleVmById -VmUuid $id
+            if ($Limit) {
+                $params['limit'] = $Limit
             }
-        }
-    }
 
-    end {
-        if ($PSCmdlet.ParameterSetName -eq "Filter") {
             try {
                 $uri = "$script:XoHost/rest/v0/vms"
                 Write-Verbose "Getting VMs from $uri with parameters: $($params | ConvertTo-Json -Compress)"
