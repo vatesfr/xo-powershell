@@ -176,17 +176,6 @@ function Get-XoTask {
         $params = @{
             fields = $script:XO_TASK_FIELDS
         }
-
-        if ($PSCmdlet.ParameterSetName -eq "Filter" -and $PSBoundParameters.ContainsKey('Status')) {
-            $params['filter'] = $Status
-        }
-
-        if ($PSCmdlet.ParameterSetName -eq "Filter" -and $Limit -ne 0) {
-            $params['limit'] = $Limit
-            if (!$PSBoundParameters.ContainsKey('Limit')) {
-                Write-Warning "No limit specified. Using default limit of $Limit. Use -Limit 0 for unlimited results."
-            }
-        }
     }
 
     process {
@@ -199,6 +188,14 @@ function Get-XoTask {
 
     end {
         if ($PSCmdlet.ParameterSetName -eq "Filter") {
+            if ($Status) {
+                $params['filter'] = $Status
+            }
+
+            if ($Limit) {
+                $params['limit'] = $Limit
+            }
+
             try {
                 Write-Verbose "Getting tasks with parameters: $($params | ConvertTo-Json -Compress)"
                 $uri = "$script:XoHost/rest/v0/tasks"

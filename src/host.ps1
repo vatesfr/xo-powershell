@@ -108,23 +108,6 @@ function Get-XoHost {
         }
 
         $params = @{ fields = $script:XO_HOST_FIELDS }
-
-        if ($PSCmdlet.ParameterSetName -eq "Filter") {
-            $AllFilters = $Filter
-
-            if ($PoolUuid) {
-                $AllFilters = "$AllFilters `$pool:$PoolUuid"
-            }
-
-            if ($AllFilters) {
-                Write-Verbose "Filter: $AllFilters"
-                $params["filter"] = $AllFilters
-            }
-        }
-
-        if ($Limit) {
-            $params["limit"] = $Limit
-        }
     }
 
     process {
@@ -137,6 +120,21 @@ function Get-XoHost {
 
     end {
         if ($PSCmdlet.ParameterSetName -eq "Filter") {
+            $AllFilters = $Filter
+
+            if ($PoolUuid) {
+                $AllFilters = "$AllFilters `$pool:$PoolUuid"
+            }
+
+            if ($AllFilters) {
+                Write-Verbose "Filter: $AllFilters"
+                $params["filter"] = $AllFilters
+            }
+
+            if ($Limit) {
+                $params["limit"] = $Limit
+            }
+
             try {
                 $uri = "$script:XoHost/rest/v0/hosts"
                 $hostsResponse = Invoke-XoRestMethod -Uri $uri -Body $params

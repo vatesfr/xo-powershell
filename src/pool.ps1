@@ -56,7 +56,17 @@ function Get-XoPool {
         $params = @{
             fields = $script:XO_POOL_FIELDS
         }
+    }
 
+    process {
+        if ($PSCmdlet.ParameterSetName -eq "PoolUuid") {
+            foreach ($id in $PoolUuid) {
+                ConvertTo-XoPoolObject (Invoke-RestMethod -Uri "$script:XoHost/rest/v0/pools/$id" @script:XoRestParameters -Body $params)
+            }
+        }
+    }
+
+    end {
         if ($PSCmdlet.ParameterSetName -eq "Filter") {
             $AllFilters = $Filter
 
@@ -72,23 +82,11 @@ function Get-XoPool {
             if ($AllFilters) {
                 $params["filter"] = $AllFilters
             }
-        }
 
-        if ($Limit) {
-            $params["limit"] = $Limit
-        }
-    }
-
-    process {
-        if ($PSCmdlet.ParameterSetName -eq "PoolUuid") {
-            foreach ($id in $PoolUuid) {
-                ConvertTo-XoPoolObject (Invoke-RestMethod -Uri "$script:XoHost/rest/v0/pools/$id" @script:XoRestParameters -Body $params)
+            if ($Limit) {
+                $params["limit"] = $Limit
             }
-        }
-    }
 
-    end {
-        if ($PSCmdlet.ParameterSetName -eq "Filter") {
             (Invoke-RestMethod -Uri "$script:XoHost/rest/v0/pools" @script:XoRestParameters -Body $params) | ConvertTo-XoPoolObject
         }
     }

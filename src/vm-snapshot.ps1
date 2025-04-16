@@ -87,17 +87,6 @@ function Get-XoVmSnapshot {
         }
 
         $params = @{ fields = $script:XO_VM_SNAPSHOT_FIELDS }
-
-        if ($PSBoundParameters.ContainsKey('Filter')) {
-            $params.filter = $Filter
-        }
-
-        if ($Limit -ne 0) {
-            $params.limit = $Limit
-            if (!$PSBoundParameters.ContainsKey('Limit')) {
-                Write-Warning "No limit specified. Using default limit of $Limit. Use -Limit 0 for unlimited results."
-            }
-        }
     }
 
     process {
@@ -117,6 +106,14 @@ function Get-XoVmSnapshot {
 
     end {
         if ($PSCmdlet.ParameterSetName -eq "Filter") {
+            if ($Filter) {
+                $params["filter"] = $Filter
+            }
+
+            if ($Limit) {
+                $params["limit"] = $Limit
+            }
+
             try {
                 $uri = "$script:XoHost/rest/v0/vm-snapshots"
                 Write-Verbose "Getting VM snapshots from $uri with parameters: $($params | ConvertTo-Json -Compress)"

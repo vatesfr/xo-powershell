@@ -114,17 +114,6 @@ function Get-XoServer {
         }
 
         $params = @{ fields = $script:XO_SERVER_FIELDS }
-
-        if ($PSCmdlet.ParameterSetName -eq "Filter" -and $Filter) {
-            $params['filter'] = $Filter
-        }
-
-        if ($Limit -ne 0 -and $PSCmdlet.ParameterSetName -eq "Filter") {
-            $params['limit'] = $Limit
-            if (!$PSBoundParameters.ContainsKey('Limit')) {
-                Write-Warning "No limit specified. Using default limit of $Limit. Use -Limit 0 for unlimited results."
-            }
-        }
     }
 
     process {
@@ -137,6 +126,16 @@ function Get-XoServer {
 
     end {
         if ($PSCmdlet.ParameterSetName -eq "Filter") {
+            $AllFilters = $Filter
+
+            if ($AllFilters) {
+                $params["filter"] = $AllFilters
+            }
+
+            if ($Limit) {
+                $params["limit"] = $Limit
+            }
+
             try {
                 Write-Verbose "Getting servers with parameters: $($params | ConvertTo-Json -Compress)"
                 $uri = "$script:XoHost/rest/v0/servers"

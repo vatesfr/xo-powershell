@@ -54,28 +54,6 @@ function Get-XoVif {
         $params = @{
             fields = $script:XO_VIF_FIELDS
         }
-
-        if ($PSCmdlet.ParameterSetName -eq "Filter") {
-            $AllFilters = $Filter
-
-            if ($Name) {
-                $AllFilters = "$AllFilters name_label:`"$Name`""
-            }
-
-            if ($Tag) {
-                $tags = ($tag | ForEach-Object { "`"$_`"" }) -join " "
-                $AllFilters = "$AllFilters tags:($tags)"
-            }
-
-            $params = Remove-XoEmptyValues @{
-                filter = $AllFilters
-                fields = $script:XO_VIF_FIELDS
-            }
-        }
-
-        if ($Limit) {
-            $params["limit"] = $Limit
-        }
     }
 
     process {
@@ -88,6 +66,25 @@ function Get-XoVif {
 
     end {
         if ($PSCmdlet.ParameterSetName -eq "Filter") {
+            $AllFilters = $Filter
+
+            if ($Name) {
+                $AllFilters = "$AllFilters name_label:`"$Name`""
+            }
+
+            if ($Tag) {
+                $tags = ($tag | ForEach-Object { "`"$_`"" }) -join " "
+                $AllFilters = "$AllFilters tags:($tags)"
+            }
+
+            if ($AllFilters) {
+                $params["filter"] = $AllFilters
+            }
+
+            if ($Limit) {
+                $params["limit"] = $Limit
+            }
+
             (Invoke-RestMethod -Uri "$script:XoHost/rest/v0/vifs" @script:XoRestParameters -Body $params) | ConvertTo-XoVifObject
         }
     }

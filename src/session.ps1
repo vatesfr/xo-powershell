@@ -63,6 +63,9 @@ function Connect-XoSession {
         [string]$Token,
 
         [Parameter()]
+        [int]$Limit,
+
+        [Parameter()]
         [switch]$SaveCredentials,
 
         [Parameter()]
@@ -72,8 +75,14 @@ function Connect-XoSession {
     $script:XoHost = $HostName.TrimEnd("/")
     Write-Verbose "Connecting to Xen Orchestra at $script:XoHost"
 
-    # Reset session limit to default value on new connection
-    $script:XoSessionLimit = $script:XO_DEFAULT_LIMIT
+    if ($PSBoundParameters.ContainsKey('Limit')) {
+        $script:XoSessionLimit = $Limit
+    }
+    else {
+        Write-Warning "No limit specified. Using default limit of $script:XO_DEFAULT_LIMIT. Use -Limit 0 for unlimited results."
+        # Reset session limit to default value on new connection
+        $script:XoSessionLimit = $script:XO_DEFAULT_LIMIT
+    }
 
     $needsSave = $SaveCredentials
 

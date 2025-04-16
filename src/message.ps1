@@ -56,25 +56,6 @@ function Get-XoMessage {
         $params = @{
             fields = $script:XO_MESSAGE_FIELDS
         }
-
-        if ($PSCmdlet.ParameterSetName -eq "Filter") {
-            $AllFilters = $Filter
-
-            if ($Name) {
-                $AllFilters = "$AllFilters name:`"$Name`""
-            }
-
-            if ($AllFilters) {
-                $params["filter"] = $AllFilters
-            }
-        }
-
-        # numbers are not affected by Remove-XoEmptyValues
-        # having $Limit be in ParameterSetName = "MessageUuid" is quite nonsensical, but hopefully better than having
-        # a ton of ParameterSetNames.
-        if ($Limit) {
-            $params["limit"] = $Limit
-        }
     }
 
     process {
@@ -87,6 +68,22 @@ function Get-XoMessage {
 
     end {
         if ($PSCmdlet.ParameterSetName -eq "Filter") {
+            $AllFilters = $Filter
+
+            if ($Name) {
+                $AllFilters = "$AllFilters name:`"$Name`""
+            }
+
+            if ($AllFilters) {
+                $params["filter"] = $AllFilters
+            }
+
+            # having $Limit be in ParameterSetName = "MessageUuid" is quite nonsensical, but hopefully better than having
+            # a ton of ParameterSetNames.
+            if ($Limit) {
+                $params["limit"] = $Limit
+            }
+
             # the parentheses forces the resulting array to unpack, don't remove them!
             (Invoke-RestMethod -Uri "$script:XoHost/rest/v0/messages" @script:XoRestParameters -Body $params) | ConvertTo-XoMessageObject
         }
