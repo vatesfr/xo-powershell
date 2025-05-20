@@ -11,6 +11,7 @@
         PSData = @{
             LicenseUri = 'https://spdx.org/licenses/Apache-2.0.html'
             ProjectUri = 'https://github.com/vatesfr/xo-powershell'
+            Prerelease = 'beta'
         }
     }
     FunctionsToExport = @(
