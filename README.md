@@ -9,6 +9,16 @@ A PowerShell module to interact with Xen Orchestra's REST API, allowing you to m
 
 ## Installation
 
+You can install from sources or from the PowerShell Gallery (easier).
+
+### From PowerShell Gallery
+
+```powershell
+Install-Module -Name xo-powershell -AllowPrerelease
+```
+
+### From sources
+
 1. Clone this repository or download the module files
 2. Place them in a directory of your choice
 3. Import the module:
