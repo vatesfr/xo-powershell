@@ -29,13 +29,14 @@ function ConvertTo-XoVmObject {
             HostUuid    = $InputObject.$container
         }
 
-        if ($null -ne $InputObject.CPUs) {
-            if ($InputObject.CPUs.PSObject.Properties.Name -contains 'number') {
-                $props | Add-Member -MemberType NoteProperty -Name CPUs -Value $InputObject.CPUs.number
-            }
-            elseif ($InputObject.CPUs.PSObject.Properties.Name -contains 'max') {
-                $props | Add-Member -MemberType NoteProperty -Name CPUs -Value $InputObject.CPUs.max
-            }
+        if ($InputObject.CPUs.number) {
+            $props["CPUs"] = $InputObject.CPUs.number
+        }
+        elseif ($InputObject.CPUs.max) {
+            $props["CPUs"] = $InputObject.CPUs.max
+        }
+        else {
+            $props["CPUs"] = $null
         }
 
         Set-XoObject $InputObject -TypeName XoPowershell.Vm -Properties $props
