@@ -87,6 +87,15 @@
 
         # vbd
         "Get-XoVbd"
+
+        # alarm
+        "Get-XoAlarm"
+
+        # schedule
+        "Get-XoSchedule"
+
+        # vm-template
+        "Get-XoVmTemplate"
     )
     AliasesToExport   = @(
         "Connect-XenOrchestra"
@@ -110,5 +119,8 @@
         "formats/pif.ps1xml"
         "formats/vif.ps1xml"
         "formats/vbd.ps1xml"
+        "formats/alarm.ps1xml"
+        "formats/schedule.ps1xml"
+        "formats/vm-template.ps1xml"
     )
 }
