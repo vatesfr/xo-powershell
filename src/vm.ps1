@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 $script:XO_VM_FIELDS = "uuid,name_label,name_description,power_state,addresses,tags,memory,VIFs,snapshots,current_operations,auto_poweron,os_version,startTime,VCPUs_at_startup,CPUs,VCPUs_number,`$VBDs"
+$script:XO_VM_TEMPLATE_FIELDS = $script:XO_VM_FIELDS + ",isDefaultTemplate"
 
 function ConvertTo-XoVmObject {
     <#
