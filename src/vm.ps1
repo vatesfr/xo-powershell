@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
-$script:XO_VM_FIELDS = "uuid,name_label,name_description,power_state,addresses,tags,memory,VIFs,snapshots,current_operations,auto_poweron,os_version,startTime,VCPUs_at_startup,CPUs,VCPUs_number,`$VBDs"
+$script:XO_VM_FIELDS = "uuid,name_label,name_description,power_state,addresses,tags,memory,VIFs,snapshots,current_operations,auto_poweron,os_version,startTime,VCPUs_at_startup,CPUs,VCPUs_number,affinityHost,coresPerSocket,high_availability,`$VBDs"
 $script:XO_VM_TEMPLATE_FIELDS = $script:XO_VM_FIELDS + ",isDefaultTemplate"
 
 function ConvertTo-XoVmObject {
@@ -21,13 +21,18 @@ function ConvertTo-XoVmObject {
 
     process {
         $props = @{
-            VmUuid      = $InputObject.uuid
-            Name        = $InputObject.name_label
-            Description = $InputObject.name_description
-            PowerState  = $InputObject.power_state
-            OsVersion   = $InputObject.os_version
-            Parent      = $InputObject.parent
-            HostUuid    = $InputObject.$container
+            VmUuid         = $InputObject.uuid
+            Name           = $InputObject.name_label
+            Description    = $InputObject.name_description
+            PowerState     = $InputObject.power_state
+            OsVersion      = $InputObject.os_version
+            Parent         = $InputObject.parent
+            HostUuid       = $InputObject.$container
+            AffinityHost   = $InputObject.affinityHost
+            MemorySize     = $InputObject.memory.size
+            CoresPerSocket = $InputObject.coresPerSocket
+            AutoPoweron    = $InputObject.auto_poweron
+            HA             = $InputObject.high_availability
         }
 
         if ($InputObject.CPUs.number) {
@@ -199,6 +204,42 @@ function Get-XoVm {
 }
 
 function Set-XoVm {
+    <#
+    .SYNOPSIS
+        Update VM settings.
+    .DESCRIPTION
+        Modifies properties of a VM such as name, description, tags, memory,
+        CPU count, CPU topology, host affinity, and auto power-on.
+    .PARAMETER VmUuid
+        The UUID of the VM to update.
+    .PARAMETER Name
+        Set the VM name.
+    .PARAMETER Description
+        Set the VM description.
+    .PARAMETER Tags
+        Set the VM tags.
+    .PARAMETER AffinityHost
+        Set the host affinity (preferred host UUID for the VM).
+    .PARAMETER Memory
+        Set the memory size in bytes.
+    .PARAMETER CPUs
+        Set the number of virtual CPUs.
+    .PARAMETER CoresPerSocket
+        Set the number of cores per socket (affects CPU topology).
+    .PARAMETER AutoPoweron
+        Set whether the VM should auto-start when the host boots.
+    .PARAMETER HA
+        Set the high availability restart priority. Valid values: empty string (disabled), "restart", "best-effort".
+    .EXAMPLE
+        Set-XoVm -VmUuid "12345678-abcd-1234-abcd-1234567890ab" -Memory 4294967296
+        Sets the VM memory to 4 GB.
+    .EXAMPLE
+        Get-XoVm -PowerState Running | ForEach-Object { Set-XoVm -VmUuid $_.VmUuid -AffinityHost $_.HostUuid }
+        Sets each running VM's host affinity to its current host.
+    .EXAMPLE
+        Set-XoVm -VmUuid "12345678-abcd-1234-abcd-1234567890ab" -CPUs 4 -CoresPerSocket 2
+        Sets the VM to 4 vCPUs with 2 cores per socket (2 sockets).
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory, ValueFromPipelineByPropertyName, Position = 0)]
@@ -212,7 +253,27 @@ function Set-XoVm {
         [string]$Description,
 
         [Parameter()]
-        [string[]]$Tags
+        [string[]]$Tags,
+
+        [Parameter()]
+        [ValidatePattern("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")]
+        [string]$AffinityHost,
+
+        [Parameter()]
+        [long]$Memory,
+
+        [Parameter()]
+        [int]$CPUs,
+
+        [Parameter()]
+        [int]$CoresPerSocket,
+
+        [Parameter()]
+        [bool]$AutoPoweron,
+
+        [Parameter()]
+        [ValidateSet("", "restart", "best-effort")]
+        [string]$HA
     )
 
     $params = @{}
@@ -225,6 +286,24 @@ function Set-XoVm {
     }
     if ($PSBoundParameters.ContainsKey("Tags")) {
         $params["tags"] = $Tags
+    }
+    if ($PSBoundParameters.ContainsKey("AffinityHost")) {
+        $params["affinityHost"] = $AffinityHost
+    }
+    if ($PSBoundParameters.ContainsKey("Memory")) {
+        $params["memory"] = $Memory
+    }
+    if ($PSBoundParameters.ContainsKey("CPUs")) {
+        $params["CPUs"] = $CPUs
+    }
+    if ($PSBoundParameters.ContainsKey("CoresPerSocket")) {
+        $params["coresPerSocket"] = $CoresPerSocket
+    }
+    if ($PSBoundParameters.ContainsKey("AutoPoweron")) {
+        $params["auto_poweron"] = $AutoPoweron
+    }
+    if ($PSBoundParameters.ContainsKey("HA")) {
+        $params["high_availability"] = $HA
     }
 
     if ($params.Count -gt 0) {
