@@ -96,6 +96,13 @@
 
         # vm-template
         "Get-XoVmTemplate"
+
+        # tags
+        "Add-XoTag"
+        "Remove-XoTag"
+        "Get-XoTag"
+        "Rename-XoTag"
+        "Get-XoUntagged"
     )
     AliasesToExport   = @(
         "Connect-XenOrchestra"
